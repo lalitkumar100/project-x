@@ -3,3 +3,6 @@
 
 # ignore backend node_modules
 back-end/node_modules/
+data/
+learned/
+frontend/node_modules/

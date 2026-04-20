@@ -1,0 +1,291 @@
+-- =========================
+-- BRANDS
+-- =========================
+CREATE TABLE brands (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    rating DECIMAL(2,1),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- CATEGORIES
+-- =========================
+CREATE TABLE categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- SUBCATEGORIES
+-- =========================
+CREATE TABLE subcategories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+-- =========================
+-- ITEMS
+-- =========================
+CREATE TABLE items (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+
+    brand_id INT,
+    category_id INT,
+    subcategory_id INT,
+
+    quantity INT DEFAULT 0,
+    reorder_level INT,
+
+    mrp DECIMAL(10,2),
+    net_buy_price DECIMAL(10,2),
+    total_items_sold INT,
+
+    warranty_months INT,
+   
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE SET NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL
+);
+
+-- =========================
+-- CONTACTS
+-- =========================
+CREATE TABLE contacts (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    contact_type VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE contact_phones (
+    id SERIAL PRIMARY KEY,
+    contact_id INT,
+    phone VARCHAR(20),
+    label VARCHAR(50),
+
+    FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE contact_addresses (
+    id SERIAL PRIMARY KEY,
+    contact_id INT,
+    address_line TEXT,
+    city VARCHAR(100),
+    state VARCHAR(100),
+    pincode VARCHAR(20),
+    label VARCHAR(50),
+
+    FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+);
+
+-- =========================
+-- PURCHASES
+-- =========================
+CREATE TABLE purchases (
+    id SERIAL PRIMARY KEY,
+
+    wholesaler_id INT,
+    transporter_id INT,
+
+    invoice_number VARCHAR(100),
+    payment_method VARCHAR(50),
+
+    total_amount DECIMAL(12,2),
+    total_box INT,
+    extra_cost DECIMAL(10,2),
+
+    billing_date DATE,
+    delivered_date DATE,
+
+    payment_status VARCHAR(50),
+    billing_type VARCHAR(50),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (wholesaler_id) REFERENCES contacts(id),
+    FOREIGN KEY (transporter_id) REFERENCES contacts(id)
+);
+
+CREATE TABLE purchase_items (
+    id SERIAL PRIMARY KEY,
+    purchase_id INT,
+    item_id INT,
+
+    quantity INT,
+    buy_price DECIMAL(10,2),
+    total_price DECIMAL(12,2),
+    tax_percent DECIMAL(5,2),
+
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+-- =========================
+-- EMPLOYEES
+-- =========================
+CREATE TABLE employees (
+    id SERIAL PRIMARY KEY,
+
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(20),
+
+    role VARCHAR(50),
+    salary DECIMAL(10,2),
+    joining_date DATE,
+
+    status VARCHAR(50),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- CUSTOMERS
+-- =========================
+CREATE TABLE customers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE customer_phones (
+    id SERIAL PRIMARY KEY,
+    customer_id INT,
+    phone VARCHAR(20),
+    label VARCHAR(50),
+
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE customer_addresses (
+    id SERIAL PRIMARY KEY,
+    customer_id INT,
+    address_line TEXT,
+    city VARCHAR(100),
+    state VARCHAR(100),
+    pincode VARCHAR(20),
+    label VARCHAR(50),
+
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+-- =========================
+-- SALES
+-- =========================
+CREATE TABLE sales (
+    id SERIAL PRIMARY KEY,
+
+    invoice_number VARCHAR(100),
+
+    customer_id INT,
+    employee_id INT,
+    transporter_id INT,
+
+    customer_type VARCHAR(50),
+    billing_type VARCHAR(50),
+
+    total_amount DECIMAL(12,2),
+    extra_cost DECIMAL(10,2),
+    transport_cost DECIMAL(10,2),
+    final_amount DECIMAL(12,2),
+
+    payment_method VARCHAR(50),
+    payment_status VARCHAR(50),
+
+    billing_date DATE,
+    delivered_date DATE,
+
+    total_box INT,
+    status VARCHAR(50),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (transporter_id) REFERENCES contacts(id)
+);
+
+-- =========================
+-- SALES ITEMS
+-- =========================
+CREATE TABLE sales_items (
+    id SERIAL PRIMARY KEY,
+
+    sale_id INT,
+    item_id INT,
+
+    serial_no VARCHAR(100),
+
+    quantity INT,
+    sell_price DECIMAL(10,2),
+    total_price DECIMAL(12,2),
+
+    discount DECIMAL(10,2),
+    tax_amount DECIMAL(10,2),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+-- =========================
+-- REPLACEMENT ITEMS
+-- =========================
+CREATE TABLE replacement_items (
+    id SERIAL PRIMARY KEY,
+
+    customer_id INT,
+    sale_id INT,
+    item_id INT,
+
+    replacement_date DATE,
+
+    reason VARCHAR(50),
+    reason_details TEXT,
+
+    quantity INT,
+    status VARCHAR(50),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (sale_id) REFERENCES sales(id),
+    FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+
+
+//use this views 
+
+//=====================================================
+items_overview
+//===================================================
+CREATE OR REPLACE VIEW items_overview AS
+SELECT
+    i.id,
+    i.name,
+    i.quantity,
+    b.name AS brand,
+    s.name AS subcategory,
+    i.total_items_sold,
+    i.warranty_months,
+    i.mrp,
+    i.reorder_level,
+    i.description,
+    i.net_buy_price
+FROM items i
+LEFT JOIN brands b ON i.brand_id = b.id
+LEFT JOIN subcategories s ON i.subcategory_id = s.id;

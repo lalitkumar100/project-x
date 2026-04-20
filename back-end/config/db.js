@@ -1,12 +1,16 @@
-import pkg from 'pg';
-const { Pool } = pkg;
-
+require('dotenv').config();
+const { Pool } = require('pg');
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'your_db',
-  password: 'your_password',
-  port: 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: String(process.env.DB_PASSWORD), // extra safety
+  port: process.env.DB_PORT,
 });
 
-export default pool;
+
+pool.connect()
+  .then(() => console.log('Connected to DB'))
+  .catch(err => console.error('Connection error', err.stack));
+
+module.exports = pool;
