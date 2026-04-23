@@ -65,6 +65,7 @@ CREATE TABLE contacts (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     contact_type VARCHAR(50),
+    gst_no varchar(12),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -289,3 +290,69 @@ SELECT
 FROM items i
 LEFT JOIN brands b ON i.brand_id = b.id
 LEFT JOIN subcategories s ON i.subcategory_id = s.id;
+
+
+create or replace view wholesaler_all as
+SELECT 
+    c.id,
+    c.name,
+    c.gst_no,
+    
+    -- Any one phone
+    (
+        SELECT cp.phone 
+        FROM contact_phones cp 
+        WHERE cp.contact_id = c.id 
+        LIMIT 1
+    ) AS phone,
+
+    -- Any one city
+    (
+        SELECT ca.city 
+        FROM contact_addresses ca 
+        WHERE ca.contact_id = c.id 
+        LIMIT 1
+    ) AS city
+
+FROM contacts c
+WHERE c.contact_type = 'wholesaler';
+
+CREATE OR REPLACE VIEW wholesaler_details_view AS
+SELECT 
+  c.id,
+  c.name,
+  c.email,
+  c.contact_type,
+  c.gst_no,
+  c.created_at,
+
+  -- 📞 Phones
+  COALESCE(
+    json_agg(DISTINCT jsonb_build_object(
+      'id', p.id,
+      'phone', p.phone,
+      'label', p.label
+    )) FILTER (WHERE p.id IS NOT NULL),
+    '[]'
+  ) AS phones,
+
+  -- 📍 Addresses
+  COALESCE(
+    json_agg(DISTINCT jsonb_build_object(
+      'id', a.id,
+      'address_line', a.address_line,
+      'city', a.city,
+      'state', a.state,
+      'pincode', a.pincode,
+      'label', a.label
+    )) FILTER (WHERE a.id IS NOT NULL),
+    '[]'
+  ) AS addresses
+
+FROM contacts c
+LEFT JOIN contact_phones p ON p.contact_id = c.id
+LEFT JOIN contact_addresses a ON a.contact_id = c.id
+
+WHERE c.contact_type = 'wholesaler'
+
+GROUP BY c.id;
