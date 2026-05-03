@@ -25,7 +25,7 @@ const searchWholesalers = asyncHandler(async (req, res) => {
   let params = [];
 
   if (search === '') {
-    query = 'SELECT * FROM wholesaler_list';
+    query = 'SELECT * FROM wholesaler_all';
   } else {
     query = `
       SELECT * 
@@ -49,6 +49,55 @@ const searchWholesalers = asyncHandler(async (req, res) => {
     },
   });
 });
+
+/**
+ * @desc Get wholesaler search suggestions (name, gst, email)
+ * @route GET /api/wholesalers/suggestions?q=searchText
+ * @access Public/Private
+ */
+const getWholesalerSuggestions = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+
+    // 🔎 Validate query
+    if (!q || q.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const search = `%${q.trim().toLowerCase()}%`;
+
+    const query = `
+      SELECT 
+        id,
+        name,
+        email,
+        gst_no
+      FROM contacts
+      WHERE contact_type = 'wholesaler'
+        AND (
+          LOWER(name) LIKE $1 OR
+          LOWER(email) LIKE $1 OR
+          LOWER(gst_no) LIKE $1
+        )
+      ORDER BY name ASC
+      LIMIT 10;
+    `;
+
+    const { rows } = await pool.query(query, [search]);
+
+    res.status(200).json({
+      success: true,
+      count: rows.length,
+      data: rows,
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 /**
@@ -529,6 +578,7 @@ module.exports = {
   updatePhone,
   getWholesalerDetails,
   updateWholesalerBasicInfo,
-  updateWholesalerAddress
+  updateWholesalerAddress,
+  getWholesalerSuggestions
 
 };  

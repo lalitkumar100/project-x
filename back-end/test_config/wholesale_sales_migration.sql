@@ -1,0 +1,3 @@
+ALTER TABLE sales
+ADD COLUMN IF NOT EXISTS blockchain_status VARCHAR(20) DEFAULT 'pending',
+ADD COLUMN IF NOT EXISTS blockchain_txn_id VARCHAR(255);

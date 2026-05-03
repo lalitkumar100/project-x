@@ -1,0 +1,154 @@
+================================================================================
+  TCG API DOCUMENTATION
+  Project-X Backend
+  Last Updated: 2026-05-02
+================================================================================
+
+BASE URL
+--------
+  All TCG routes are prefixed with:
+  /v1/api/tcg
+
+  The TCG external service base URL is sourced from the environment variable:
+    TCG_URL  (e.g. http://localhost:5000)
+
+================================================================================
+  ENDPOINT 1 — TCG Login
+================================================================================
+
+  Method  : POST
+  Route   : /v1/api/tcg/login
+  Full URL: {{HOST}}/v1/api/tcg/login
+  Access  : Public (no auth required)
+
+  Description:
+    Authenticates against the external TCG service using email and password.
+    On success, extracts the JWT token from the TCG response and writes it
+    to the frontend .env file as VITE_TCG_TOKEN. Also returns the token in
+    the API response.
+
+  ── REQUEST ────────────────────────────────────────────────────────────────
+
+  Headers:
+    Content-Type: application/json
+
+  Body (JSON):
+    {
+      "email"    : "lalitkumar709086@gmail.com",   // string, required
+      "password" : "StrongPass@123"                 // string, required
+    }
+
+  Field Validation:
+    • email    — must be a non-empty string
+    • password — must be a non-empty string
+    • Both fields are required; missing either returns 400
+
+  ── RESPONSES ──────────────────────────────────────────────────────────────
+
+  200 OK — Login successful, token written to frontend .env
+    {
+      "success": true,
+      "message": "Logged in successfully. Token saved to frontend .env.",
+      "token"  : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+
+  400 Bad Request — Missing email or password
+    {
+      "success": false,
+      "message": "Email and password are required."
+    }
+
+  500 Internal Server Error — TCG_URL not set in environment
+    {
+      "success": false,
+      "message": "TCG_URL is not configured in the environment."
+    }
+
+  502 Bad Gateway — TCG API responded but token was absent
+    {
+      "success": false,
+      "message": "TCG API did not return a token."
+    }
+
+  4xx/5xx (proxied) — TCG API returned an error
+    {
+      "success": false,
+      "message": "TCG API returned an error.",
+      "error"  : { ...tcg_error_payload... }
+    }
+
+  500 Internal Server Error — Unexpected server-side failure
+    {
+      "success": false,
+      "message": "Internal server error while logging in to TCG."
+    }
+
+  ── SIDE EFFECT ────────────────────────────────────────────────────────────
+
+  On success the controller reads the file:
+    frontend/.env
+
+  and upserts the following line:
+    VITE_TCG_TOKEN=<jwt_token>
+
+  If the key already exists it is replaced in-place.
+  If it does not exist it is appended at the end of the file.
+
+  ── EXAMPLE cURL ───────────────────────────────────────────────────────────
+
+  curl -X POST http://localhost:5000/v1/api/tcg/login \
+       -H "Content-Type: application/json" \
+       -d '{"email":"lalitkumar709086@gmail.com","password":"StrongPass@123"}'
+
+  ── EXAMPLE AXIOS (frontend) ───────────────────────────────────────────────
+
+  const response = await axios.post('/v1/api/tcg/login', {
+    email   : 'lalitkumar709086@gmail.com',
+    password: 'StrongPass@123',
+  });
+  console.log(response.data.token);
+
+================================================================================
+  ENVIRONMENT VARIABLES USED
+================================================================================
+
+  back-end/.env
+  ┌──────────────┬────────────────────────────────────────────────────────┐
+  │ Variable     │ Description                                            │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ TCG_URL      │ Base URL of the external TCG service                   │
+  │ TCG_TOKEN    │ (Optional) Last known token stored in backend .env     │
+  └──────────────┴────────────────────────────────────────────────────────┘
+
+  frontend/.env  (written by the controller)
+  ┌────────────────┬──────────────────────────────────────────────────────┐
+  │ Variable       │ Description                                          │
+  ├────────────────┼──────────────────────────────────────────────────────┤
+  │ VITE_TCG_TOKEN │ JWT token obtained from the last successful TCG login│
+  └────────────────┴──────────────────────────────────────────────────────┘
+
+================================================================================
+  FILE STRUCTURE
+================================================================================
+
+  back-end/
+  ├── controllers/
+  │   └── TCGControllers.js   ← tcgLogin controller function
+  ├── routes/
+  │   └── tcg.js              ← POST /login route
+  └── app.js                  ← mounts /v1/api/tcg → tcg router
+
+================================================================================
+  NOTES
+================================================================================
+
+  • The controller uses axios to call the TCG external API.
+    Make sure axios is installed:  npm install axios
+
+  • Writing to frontend/.env at runtime is intended for development / internal
+    tooling use.  In production consider using a secrets manager instead.
+
+  • The TCG JWT token expires (check the exp claim). Re-run the login endpoint
+    to refresh the token before it expires.
+
+================================================================================

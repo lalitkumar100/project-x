@@ -1,0 +1,614 @@
+# Retail Sales API Documentation
+
+## Endpoint
+
+`POST /v1/api/sales/retail`
+
+Creates a retail sale, inserts sale items, reduces item stock, and returns the generated invoice details.
+
+## Content Type
+
+`Content-Type: application/json`
+
+## Request Body
+
+```json
+{
+  "customer": {
+    "type": "registered",
+    "id": 12,
+    "name": "Rahul Sharma",
+    "phone": "9876543210",
+    "email": "rahul.sharma@example.com"
+  },
+  "items": [
+    {
+      "item_id": 5,
+      "quantity": 2,
+      "sell_price": 750,
+      "discount": 50,
+      "tax_amount": 90
+    }
+  ],
+  "summary": {
+    "total_amount": 1500,
+    "extra_cost": 0,
+    "transport_cost": 100,
+    "final_amount": 1640
+  },
+  "payment": {
+    "method": "cash",
+    "status": "paid"
+  },
+  "meta": {
+    "employee_id": 1,
+    "billing_date": "2026-05-02",
+    "status": "completed"
+  }
+}
+```
+
+## Customer Handling
+
+### Unregistered Customer
+
+If `customer.type` is `unregistered`, the API always uses:
+
+```json
+{
+  "customer_id": 1
+}
+```
+
+No new customer is created.
+
+Example:
+
+```json
+{
+  "customer": {
+    "type": "unregistered"
+  }
+}
+```
+
+### Registered Customer With ID
+
+If `customer.type` is `registered` and `customer.id` is provided:
+
+1. The API checks `customers.id`.
+2. If found, that customer is used.
+3. If not found, the API checks by phone.
+4. If phone is not found, a new customer is created.
+
+### Registered Customer Without ID
+
+If `customer.type` is `registered` and no `customer.id` is provided:
+
+1. The API searches by phone in `customer_phones.phone`.
+2. If found, the existing customer is used.
+3. If not found, the API creates a new row in `customers`.
+4. The phone is saved in `customer_phones`.
+
+Required fields for registered customer:
+
+```json
+{
+  "name": "required",
+  "phone": "required",
+  "email": "optional"
+}
+```
+
+## Database Tables Used
+
+- `customers`
+- `customer_phones`
+- `sales`
+- `sales_items`
+- `items`
+
+Note: In the actual schema, customer phone is stored in `customer_phones`, not directly in `customers`.
+
+## Billing Logic
+
+For each item:
+
+1. The API locks the item row using `SELECT ... FOR UPDATE`.
+2. It checks that the item exists.
+3. It checks `quantity > 0`.
+4. It checks `quantity <= items.quantity`.
+5. It checks `sell_price >= items.net_buy_price`.
+6. It inserts into `sales_items`.
+7. It reduces `items.quantity`.
+8. It increases `items.total_items_sold`.
+
+The whole request runs inside one database transaction.
+
+If any step fails, the transaction is rolled back.
+
+## Success Response
+
+Status: `201 Created`
+
+```json
+{
+  "success": true,
+  "sale_id": 7,
+  "invoice_number": "INV-2026-0007",
+  "customer_id": 12
+}
+```
+
+## Possible Outcomes
+
+### 1. Success With Existing Registered Customer By ID
+
+Condition:
+
+- `customer.type = registered`
+- `customer.id` exists in `customers`
+
+Result:
+
+```json
+{
+  "success": true,
+  "sale_id": 7,
+  "invoice_number": "INV-2026-0007",
+  "customer_id": 12
+}
+```
+
+### 2. Success With Existing Registered Customer By Phone
+
+Condition:
+
+- `customer.type = registered`
+- `customer.id` missing or invalid/not found
+- `customer.phone` exists in `customer_phones`
+
+Result:
+
+```json
+{
+  "success": true,
+  "sale_id": 8,
+  "invoice_number": "INV-2026-0008",
+  "customer_id": 12
+}
+```
+
+### 3. Success With Newly Created Registered Customer
+
+Condition:
+
+- `customer.type = registered`
+- `customer.phone` does not exist
+
+Result:
+
+```json
+{
+  "success": true,
+  "sale_id": 9,
+  "invoice_number": "INV-2026-0009",
+  "customer_id": 25
+}
+```
+
+### 4. Success With Unregistered Customer
+
+Condition:
+
+- `customer.type = unregistered`
+
+Result:
+
+```json
+{
+  "success": true,
+  "sale_id": 10,
+  "invoice_number": "INV-2026-0010",
+  "customer_id": 1
+}
+```
+
+## Error Responses
+
+All handled errors return:
+
+```json
+{
+  "success": false,
+  "message": "Error message"
+}
+```
+
+### Missing Request Body
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Request body is required"
+}
+```
+
+### Invalid Customer Type
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "customer.type must be registered or unregistered"
+}
+```
+
+### Registered Customer Missing Name
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Customer name is required for registered customer"
+}
+```
+
+### Registered Customer Missing Phone
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Customer phone is required for registered customer"
+}
+```
+
+### Invalid Customer ID
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "customer.id must be a positive integer"
+}
+```
+
+### Empty Items
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "items must contain at least one item"
+}
+```
+
+### Invalid Item ID
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "item_id must be a positive integer"
+}
+```
+
+### Item Not Found
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Item 5 not found"
+}
+```
+
+### Invalid Quantity
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid quantity for item 5"
+}
+```
+
+### Insufficient Stock
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Insufficient stock for item 5"
+}
+```
+
+### Sell Price Less Than Buy Price
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "sell_price cannot be less than buy price for item 5"
+}
+```
+
+### Invalid Discount
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid discount for item 5"
+}
+```
+
+### Invalid Tax Amount
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid tax_amount for item 5"
+}
+```
+
+### Invalid Payment Method
+
+Status: `400 Bad Request`
+
+Allowed values:
+
+- `cash`
+- `UPI`
+- `card`
+
+```json
+{
+  "success": false,
+  "message": "payment.method must be cash, UPI, or card"
+}
+```
+
+### Invalid Payment Status
+
+Status: `400 Bad Request`
+
+Allowed values:
+
+- `paid`
+- `pending`
+
+```json
+{
+  "success": false,
+  "message": "payment.status must be paid or pending"
+}
+```
+
+### Invalid Billing Date
+
+Status: `400 Bad Request`
+
+Required format: `YYYY-MM-DD`
+
+```json
+{
+  "success": false,
+  "message": "meta.billing_date must be YYYY-MM-DD"
+}
+```
+
+### Invalid Employee ID
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "meta.employee_id must be a positive integer"
+}
+```
+
+### Invalid Meta Status
+
+Status: `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "meta.status must be completed"
+}
+```
+
+### Invalid Numeric Fields
+
+Status: `400 Bad Request`
+
+Examples:
+
+```json
+{
+  "success": false,
+  "message": "summary.total_amount must be a valid number"
+}
+```
+
+```json
+{
+  "success": false,
+  "message": "sell_price must be a valid number"
+}
+```
+
+## SQL Queries Used
+
+### Find Customer By ID
+
+```sql
+SELECT id
+FROM customers
+WHERE id = $1
+LIMIT 1;
+```
+
+### Find Customer By Phone
+
+```sql
+SELECT c.id
+FROM customers c
+INNER JOIN customer_phones cp ON cp.customer_id = c.id
+WHERE cp.phone = $1
+LIMIT 1;
+```
+
+### Create Customer
+
+```sql
+INSERT INTO customers (name, email)
+VALUES ($1, $2)
+RETURNING id;
+```
+
+### Create Customer Phone
+
+```sql
+INSERT INTO customer_phones (customer_id, phone, label)
+VALUES ($1, $2, $3);
+```
+
+### Lock Item For Stock Validation
+
+```sql
+SELECT id, quantity, net_buy_price
+FROM items
+WHERE id = $1
+FOR UPDATE;
+```
+
+### Insert Sale
+
+```sql
+INSERT INTO sales (
+  customer_id,
+  employee_id,
+  customer_type,
+  billing_type,
+  total_amount,
+  extra_cost,
+  transport_cost,
+  final_amount,
+  payment_method,
+  payment_status,
+  billing_date,
+  status
+) VALUES ($1, $2, $3, 'retail', $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id;
+```
+
+### Update Invoice Number
+
+```sql
+UPDATE sales
+SET invoice_number = $1
+WHERE id = $2;
+```
+
+### Insert Sale Item
+
+```sql
+INSERT INTO sales_items (
+  sale_id,
+  item_id,
+  quantity,
+  sell_price,
+  total_price,
+  discount,
+  tax_amount
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+```
+
+### Update Stock
+
+```sql
+UPDATE items
+SET quantity = quantity - $1,
+    total_items_sold = COALESCE(total_items_sold, 0) + $1
+WHERE id = $2;
+```
+
+## Transaction Flow
+
+```sql
+BEGIN;
+
+-- resolve customer
+-- lock items with FOR UPDATE
+-- validate stock and price
+-- insert sales row
+-- update invoice_number
+-- insert sales_items rows
+-- update items stock
+
+COMMIT;
+```
+
+On any failure:
+
+```sql
+ROLLBACK;
+```
+
+## cURL Example
+
+```bash
+curl -X POST http://localhost:5001/v1/api/sales/retail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": {
+      "type": "registered",
+      "name": "Rahul Sharma",
+      "phone": "9876543210",
+      "email": "rahul.sharma@example.com"
+    },
+    "items": [
+      {
+        "item_id": 5,
+        "quantity": 2,
+        "sell_price": 750,
+        "discount": 50,
+        "tax_amount": 90
+      }
+    ],
+    "summary": {
+      "total_amount": 1500,
+      "extra_cost": 0,
+      "transport_cost": 100,
+      "final_amount": 1640
+    },
+    "payment": {
+      "method": "cash",
+      "status": "paid"
+    },
+    "meta": {
+      "employee_id": 1,
+      "billing_date": "2026-05-02",
+      "status": "completed"
+    }
+  }'
+```

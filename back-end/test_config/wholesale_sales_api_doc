@@ -1,0 +1,514 @@
+# Wholesale Sales API Documentation
+
+## Endpoint
+
+`POST /v1/api/sales/wholesale`
+
+Compatibility alias:
+
+`POST /v1/api/sales/wholesaler`
+
+## Description
+
+Creates a wholesale sale using a database transaction, validates customer and stock data, optionally verifies the customer against the TCG server, and optionally writes the invoice details to the blockchain transaction API after the database sale has committed.
+
+The database is the primary source of truth. Blockchain failure does not roll back the sale. Instead, the sale row is updated with `blockchain_status = failed`.
+
+## Required Environment Variables
+
+```env
+TCG_SERVER_URL=http://localhost:5000
+TCG_TOKEN=your_tcg_bearer_token
+```
+
+## Required SQL Migration
+
+Run this once before using blockchain status tracking:
+
+```sql
+ALTER TABLE sales
+ADD COLUMN IF NOT EXISTS blockchain_status VARCHAR(20) DEFAULT 'pending',
+ADD COLUMN IF NOT EXISTS blockchain_txn_id VARCHAR(255);
+```
+
+## Request Body
+
+```json
+{
+  "customer": {
+    "type": "registered",
+    "id": 12,
+    "name": "Rahul Sharma",
+    "phone": "9876543210",
+    "tcg_id": 3,
+    "tcg_verification": true
+  },
+  "items": [
+    {
+      "item_id": 1,
+      "quantity": 2,
+      "sell_price": 2100,
+      "discount": 0,
+      "tax_amount": 0
+    }
+  ],
+  "summary": {
+    "total_amount": 4200,
+    "extra_cost": 0,
+    "transport_cost": 0,
+    "final_amount": 4200
+  },
+  "payment": {
+    "method": "cash",
+    "status": "paid"
+  },
+  "meta": {
+    "employee_id": 1,
+    "billing_date": "2026-05-02",
+    "status": "completed"
+  }
+}
+```
+
+## Customer Handling
+
+### Registered Customer With ID
+
+If `customer.type = registered` and `customer.id` is provided:
+
+1. The API checks `customers.id`.
+2. If the customer exists, that customer is used.
+3. If the id is missing or not found, the API searches by phone.
+4. If phone is not found, a new customer is created.
+
+### Registered Customer By Phone
+
+If `customer.id` is not provided:
+
+1. The API searches `customer_phones.phone`.
+2. If found, the matching customer is used.
+3. If not found, a new row is inserted into `customers`.
+4. The phone is inserted into `customer_phones`.
+
+### Unregistered Customer
+
+If `customer.type = unregistered`, customer id `1` is used.
+
+## TCG Verification Flow
+
+TCG verification runs only when:
+
+```json
+{
+  "tcg_verification": true
+}
+```
+
+When enabled:
+
+1. `customer.tcg_id` is required.
+2. The API calls:
+
+```http
+GET {{TCG_SERVER_URL}}/v1/api/users/{tcg_id}
+Authorization: Bearer {{TCG_TOKEN}}
+```
+
+3. If the TCG server returns:
+
+```json
+{
+  "message": "User not found"
+}
+```
+
+the API returns:
+
+```json
+{
+  "success": false,
+  "message": "Invalid TCG ID"
+}
+```
+
+4. If the TCG server returns `401` or `403`, the API returns:
+
+```json
+{
+  "success": false,
+  "message": "TCG authentication failed"
+}
+```
+
+5. If `tcg_verification = false`, TCG verification and blockchain submission are skipped.
+
+## Blockchain Integration
+
+Blockchain integration runs only after:
+
+1. TCG verification succeeds.
+2. The database transaction commits successfully.
+
+The API calls:
+
+```http
+POST {{TCG_SERVER_URL}}/v1/api/transactions
+Authorization: Bearer {{TCG_TOKEN}}
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "receiver_id": 3,
+  "invoice_data": {
+    "amount": 4200,
+    "invoice_number": "INV-2026-0010",
+    "items": [
+      {
+        "item_id": 1,
+        "name": "Item name",
+        "brand": "Brand name",
+        "category": "Category name",
+        "subcategory": "Subcategory name",
+        "qty": 2,
+        "rate": 2100,
+        "buy_price": 1500
+      }
+    ]
+  }
+}
+```
+
+## Database Tables Used
+
+- `customers`
+- `customer_phones`
+- `sales`
+- `sales_items`
+- `items`
+- `brands`
+- `categories`
+- `subcategories`
+- `employees`
+
+## Billing Logic
+
+1. Validate request body.
+2. Validate payment method: `cash`, `UPI`, or `card`.
+3. Validate payment status: `paid` or `pending`.
+4. Validate billing date format: `YYYY-MM-DD`.
+5. If TCG verification is enabled, validate `tcg_id` with TCG server.
+6. Begin database transaction.
+7. Resolve customer.
+8. Validate employee id if provided.
+9. Lock each item row with `FOR UPDATE`.
+10. Validate item quantity.
+11. Validate stock availability.
+12. Validate `sell_price >= net_buy_price`.
+13. Insert sale with `billing_type = wholesale`.
+14. Generate and update invoice number.
+15. Insert sale items.
+16. Reduce stock and increase `total_items_sold`.
+17. Commit transaction.
+18. If TCG verification is enabled, send blockchain transaction.
+19. Update blockchain status.
+
+## Transaction Flow
+
+```sql
+BEGIN;
+
+-- resolve customer
+-- validate employee
+-- lock item rows with FOR UPDATE
+-- validate stock and price
+-- insert sales row
+-- update invoice_number
+-- insert sales_items rows
+-- update item stock
+
+COMMIT;
+
+-- blockchain call happens after COMMIT
+-- update sales.blockchain_status to success or failed
+```
+
+On any database failure:
+
+```sql
+ROLLBACK;
+```
+
+## SQL Queries
+
+### Find Customer By ID
+
+```sql
+SELECT id
+FROM customers
+WHERE id = $1
+LIMIT 1;
+```
+
+### Find Customer By Phone
+
+```sql
+SELECT c.id
+FROM customers c
+INNER JOIN customer_phones cp ON cp.customer_id = c.id
+WHERE cp.phone = $1
+LIMIT 1;
+```
+
+### Create Customer
+
+```sql
+INSERT INTO customers (name, email)
+VALUES ($1, $2)
+RETURNING id;
+```
+
+### Create Customer Phone
+
+```sql
+INSERT INTO customer_phones (customer_id, phone, label)
+VALUES ($1, $2, 'Primary');
+```
+
+### Lock Item
+
+```sql
+SELECT
+  i.id,
+  i.quantity,
+  i.net_buy_price,
+  i.name,
+  b.name AS brand,
+  c.name AS category,
+  s.name AS subcategory
+FROM items i
+LEFT JOIN brands b ON b.id = i.brand_id
+LEFT JOIN categories c ON c.id = i.category_id
+LEFT JOIN subcategories s ON s.id = i.subcategory_id
+WHERE i.id = $1
+FOR UPDATE OF i;
+```
+
+### Insert Sale
+
+```sql
+INSERT INTO sales (
+  customer_id,
+  employee_id,
+  customer_type,
+  billing_type,
+  total_amount,
+  extra_cost,
+  transport_cost,
+  final_amount,
+  payment_method,
+  payment_status,
+  billing_date,
+  status
+) VALUES ($1, $2, $3, 'wholesale', $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id;
+```
+
+### Update Invoice Number
+
+```sql
+UPDATE sales
+SET invoice_number = $1
+WHERE id = $2;
+```
+
+### Insert Sale Item
+
+```sql
+INSERT INTO sales_items (
+  sale_id,
+  item_id,
+  quantity,
+  sell_price,
+  total_price,
+  discount,
+  tax_amount
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+```
+
+### Update Stock
+
+```sql
+UPDATE items
+SET quantity = quantity - $1,
+    total_items_sold = COALESCE(total_items_sold, 0) + $1
+WHERE id = $2;
+```
+
+### Update Blockchain Status
+
+```sql
+UPDATE sales
+SET blockchain_status = $1,
+    blockchain_txn_id = $2
+WHERE id = $3;
+```
+
+## Success Response
+
+Status: `201 Created`
+
+```json
+{
+  "success": true,
+  "sale_id": 10,
+  "invoice_number": "INV-2026-0010",
+  "customer_id": 12,
+  "blockchain_status": "success",
+  "blockchain_txn_id": "txn_123"
+}
+```
+
+If blockchain fails after DB commit:
+
+```json
+{
+  "success": true,
+  "sale_id": 10,
+  "invoice_number": "INV-2026-0010",
+  "customer_id": 12,
+  "blockchain_status": "failed",
+  "blockchain_error": "Blockchain transaction failed"
+}
+```
+
+If TCG verification is not enabled:
+
+```json
+{
+  "success": true,
+  "sale_id": 10,
+  "invoice_number": "INV-2026-0010",
+  "customer_id": 12,
+  "blockchain_status": "skipped"
+}
+```
+
+## Error Responses
+
+All handled errors return:
+
+```json
+{
+  "success": false,
+  "message": "error message"
+}
+```
+
+### Missing TCG ID
+
+```json
+{
+  "success": false,
+  "message": "tcg_id is required when TCG verification is true"
+}
+```
+
+### Invalid TCG ID
+
+```json
+{
+  "success": false,
+  "message": "Invalid TCG ID"
+}
+```
+
+### TCG Auth Failure
+
+```json
+{
+  "success": false,
+  "message": "TCG authentication failed"
+}
+```
+
+### Empty Items
+
+```json
+{
+  "success": false,
+  "message": "items must contain at least one item"
+}
+```
+
+### Insufficient Stock
+
+```json
+{
+  "success": false,
+  "message": "Insufficient stock for item 1"
+}
+```
+
+### Invalid Pricing
+
+```json
+{
+  "success": false,
+  "message": "sell_price cannot be less than buy price for item 1"
+}
+```
+
+### Invalid Payment Method
+
+```json
+{
+  "success": false,
+  "message": "payment.method must be cash, UPI, or card"
+}
+```
+
+### Invalid Employee
+
+```json
+{
+  "success": false,
+  "message": "Employee 1 not found"
+}
+```
+
+## External APIs Used
+
+### 1. TCG User Validation
+
+```http
+GET /v1/api/users/{id}
+Authorization: Bearer {{TCG_TOKEN}}
+```
+
+Purpose:
+
+Validate that the TCG user exists before allowing verified wholesale billing.
+
+### 2. Blockchain Transaction
+
+```http
+POST /v1/api/transactions
+Authorization: Bearer {{TCG_TOKEN}}
+Content-Type: application/json
+```
+
+Purpose:
+
+Submit invoice amount and item details to the blockchain transaction system after the local sale is committed.
+
+## Notes
+
+- Blockchain integration is commit-safe: the sale is not rolled back if blockchain submission fails.
+- The database remains the primary source of truth.
+- `blockchain_status = pending` is written before blockchain submission.
+- `blockchain_status = success` is written when the blockchain transaction succeeds.
+- `blockchain_status = failed` is written when the blockchain transaction fails.
+- `/v1/api/sales/wholesaler` exists as a backward-compatible alias.

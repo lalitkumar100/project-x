@@ -102,6 +102,9 @@ CREATE TABLE purchases (
     invoice_number VARCHAR(100),
     payment_method VARCHAR(50),
 
+    billing_type VARCHAR(10)
+        CHECK (billing_type IN ('inter', 'outer')),
+
     total_amount DECIMAL(12,2),
     total_box INT,
     extra_cost DECIMAL(10,2),
@@ -110,7 +113,6 @@ CREATE TABLE purchases (
     delivered_date DATE,
 
     payment_status VARCHAR(50),
-    billing_type VARCHAR(50),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
