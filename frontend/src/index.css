@@ -1,0 +1,202 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+.app-container {
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* Hide scrollbar */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/*
+  AQUA-GREEN THEME SCALE
+  ─────────────────────────────────────────────
+  You can now use classes like `bg-theme-500` or `text-theme-100`
+*/
+
+@theme inline {
+  /* Injecting raw theme scale into Tailwind */
+  --color-theme-50: var(--theme-50);
+  --color-theme-100: var(--theme-100);
+  --color-theme-200: var(--theme-200);
+  --color-theme-300: var(--theme-300);
+  --color-theme-400: var(--theme-400);
+  --color-theme-500: var(--theme-500);
+  --color-theme-600: var(--theme-600);
+  --color-theme-700: var(--theme-700);
+  --color-theme-800: var(--theme-800);
+  --color-theme-900: var(--theme-900);
+  --color-theme-950: var(--theme-950);
+
+  /* Shadcn standard mappings */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ─── LIGHT MODE & BASE VARIABLES ──────────────────────────────── */
+:root {
+  --radius: 0.625rem;
+
+  /* BASE AQUA-GREEN SCALE (oklch) */
+  --theme-50: oklch(0.98 0.02 180);
+  --theme-100: oklch(0.95 0.04 180);
+  --theme-200: oklch(0.90 0.08 180);
+  --theme-300: oklch(0.85 0.12 180);
+  --theme-400: oklch(0.78 0.15 180);
+  --theme-500: oklch(0.70 0.16 180);
+  --theme-600: oklch(0.60 0.14 180);
+  --theme-700: oklch(0.50 0.12 180);
+  --theme-800: oklch(0.42 0.10 180);
+  --theme-900: oklch(0.35 0.08 180);
+  --theme-950: oklch(0.25 0.05 180);
+
+  /* SEMANTIC LIGHT MODE MAPPING */
+  --background: var(--theme-50);
+  --foreground: var(--theme-900);
+
+  --card: oklch(1 0 0); /* White */
+  --card-foreground: var(--theme-900);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--theme-900);
+
+  --primary: var(--theme-600);
+  --primary-foreground: var(--theme-50);
+
+  --secondary: var(--theme-100);
+  --secondary-foreground: var(--theme-800);
+
+  --muted: var(--theme-100);
+  --muted-foreground: var(--theme-600);
+
+  --accent: var(--theme-200);
+  --accent-foreground: var(--theme-800);
+
+  --destructive: oklch(0.577 0.245 27.325); /* Red */
+  --destructive-foreground: oklch(0.98 0.01 0);
+
+  --border: var(--theme-200);
+  --input: var(--theme-200);
+  --ring: var(--theme-600);
+
+  /* Charts */
+  --chart-1: var(--theme-600);
+  --chart-2: var(--theme-400);
+  --chart-3: var(--theme-200);
+  --chart-4: oklch(0.646 0.222 41.116); /* Amber */
+  --chart-5: oklch(0.600 0.118 250); /* Blue */
+
+  /* Sidebar */
+  --sidebar: var(--theme-100);
+  --sidebar-foreground: var(--theme-900);
+  --sidebar-primary: var(--theme-600);
+  --sidebar-primary-foreground: var(--theme-50);
+  --sidebar-accent: var(--theme-200);
+  --sidebar-accent-foreground: var(--theme-900);
+  --sidebar-border: var(--theme-200);
+  --sidebar-ring: var(--theme-600);
+}
+
+/* ─── DARK MODE ───────────────────────────────── */
+.dark {
+  --background: var(--theme-950);
+  --foreground: var(--theme-50);
+
+  --card: var(--theme-900);
+  --card-foreground: var(--theme-50);
+  --popover: var(--theme-900);
+  --popover-foreground: var(--theme-50);
+
+  --primary: var(--theme-400);
+  --primary-foreground: var(--theme-950);
+
+  --secondary: var(--theme-800);
+  --secondary-foreground: var(--theme-50);
+
+  --muted: var(--theme-800);
+  --muted-foreground: var(--theme-300);
+
+  --accent: var(--theme-700);
+  --accent-foreground: var(--theme-50);
+
+  --destructive: oklch(0.704 0.191 22.216); /* Lighter Red */
+  --destructive-foreground: var(--theme-50);
+
+  --border: var(--theme-800);
+  --input: var(--theme-800);
+  --ring: var(--theme-400);
+
+  /* Charts */
+  --chart-1: var(--theme-400);
+  --chart-2: var(--theme-200);
+  --chart-3: var(--theme-600);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.645 0.246 16.439);
+
+  /* Sidebar */
+  --sidebar: var(--theme-950);
+  --sidebar-foreground: var(--theme-100);
+  --sidebar-primary: var(--theme-400);
+  --sidebar-primary-foreground: var(--theme-950);
+  --sidebar-accent: var(--theme-800);
+  --sidebar-accent-foreground: var(--theme-50);
+  --sidebar-border: var(--theme-800);
+  --sidebar-ring: var(--theme-400);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
