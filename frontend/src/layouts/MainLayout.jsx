@@ -85,9 +85,7 @@ export default function MainLayout() {
   // Authentication check
   React.useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login", { replace: true });
-    }
+   
   }, [navigate]);
 
   // Get breadcrumb config for current route

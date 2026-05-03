@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import  { ItemDetailsDialog }  from "./ItemDetailsDialog";
+import { ItemDetailsDialog } from "./ItemDetailsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,18 +10,17 @@ import {
 } from "lucide-react";
 import { downloadAsExcel } from "@/lib/download-utils";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL;
-const url ="http://localhost:5000"
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:6000";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 const COLUMNS = [
-  { key: "name",             label: "Name",        type: "text",   width: "col-span-2" },
-  { key: "brand",            label: "Brand",       type: "text",   width: "col-span-1" },
-  { key: "subcategory",      label: "Subcategory", type: "text",   width: "col-span-1" },
-  { key: "quantity",         label: "Qty",         type: "number", width: "col-span-1" },
-  {key: "total sold",        label: "Qty sold",     type:"number",width: "col-span-1" },
-  { key: "warranty_months",  label: "Warranty",    type: "number", width: "col-span-1" },
-  { key: "mrp",              label: "MRP",         type: "number", width: "col-span-1" },
+  { key: "name", label: "Name", type: "text", width: "col-span-2" },
+  { key: "brand", label: "Brand", type: "text", width: "col-span-1" },
+  { key: "subcategory", label: "Subcategory", type: "text", width: "col-span-1" },
+  { key: "quantity", label: "Qty", type: "number", width: "col-span-1" },
+  { key: "total sold", label: "Qty sold", type: "number", width: "col-span-1" },
+  { key: "warranty_months", label: "Warranty", type: "number", width: "col-span-1" },
+  { key: "mrp", label: "MRP", type: "number", width: "col-span-1" },
 ];
 
 // ─── Sort icon helper ─────────────────────────────────────────────────────────
@@ -29,7 +28,7 @@ function SortIcon({ colKey, sortConfig }) {
   if (sortConfig.key !== colKey)
     return <ArrowUpDown className="inline ml-1 h-3 w-3 text-teal-400" />;
   return sortConfig.dir === "asc"
-    ? <ArrowUp   className="inline ml-1 h-3 w-3 text-teal-700" />
+    ? <ArrowUp className="inline ml-1 h-3 w-3 text-teal-700" />
     : <ArrowDown className="inline ml-1 h-3 w-3 text-teal-700" />;
 }
 
@@ -37,35 +36,35 @@ export default function GeneralStockPage() {
   const navigate = useNavigate();
 
   // ── Data state ──────────────────────────────────────────────────────────────
-  const [items,       setItems]       = useState([]);
-  const [totalPages,  setTotalPages]  = useState(0);
-  const [totalItems,  setTotalItems]  = useState(0);
+  const [items, setItems] = useState([]);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading,     setLoading]     = useState(false);
+  const [loading, setLoading] = useState(false);
   const itemsPerPage = 10;
 
   // ── Search state ────────────────────────────────────────────────────────────
-  const [searchTerm,    setSearchTerm]    = useState("");
-  const [activeQuery,   setActiveQuery]   = useState("");   // committed query
-  const [suggestions,   setSuggestions]   = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");   // committed query
+  const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggIndex,     setSuggIndex]     = useState(-1);   // highlighted suggestion
+  const [suggIndex, setSuggIndex] = useState(-1);   // highlighted suggestion
 
   // ── Sort state (client-side) ────────────────────────────────────────────────
   const [sortConfig, setSortConfig] = useState({ key: null, dir: "asc" });
 
   // ── Keyboard navigation ─────────────────────────────────────────────────────
   const [highlightedRow, setHighlightedRow] = useState(-1);   // -1 = none
-  const [searchFocused,  setSearchFocused]  = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   // ── Dialog state ────────────────────────────────────────────────────────────
-  const [selectedId,      setSelectedId]      = useState(null);
-  const [isDialogOpen,    setIsDialogOpen]     = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
-  const searchInputRef  = useRef(null);
+  const searchInputRef = useRef(null);
   const suggDebounceRef = useRef(null);
-  const listRef         = useRef(null);
+  const listRef = useRef(null);
 
   // ── Fetch items ─────────────────────────────────────────────────────────────
   const fetchItems = useCallback(async (page = 1, q = "") => {
@@ -75,7 +74,7 @@ export default function GeneralStockPage() {
       const params = { page, limit: itemsPerPage };
       if (q.trim()) params.q = q.trim();
 
-      const res = await axios.get(`${url}/v1/api/admin/items/search`, {
+      const res = await axios.get(`${BASE_URL}/v1/api/admin/items/search`, {
         headers: { Authorization: `Bearer ${token}` },
         params,
       });
@@ -104,14 +103,14 @@ export default function GeneralStockPage() {
     suggDebounceRef.current = setTimeout(async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get(`${url}/v1/api/admin/items/suggestions`, {
+        const res = await axios.get(`${BASE_URL}/v1/api/admin/items/suggestions`, {
           headers: { Authorization: `Bearer ${token}` },
           params: { q: value.trim() },
         });
         // API returns array of strings or objects; normalise to string[]
         const raw = res.data.data ?? res.data ?? [];
         const names = raw.map((s) => (typeof s === "string" ? s : s.name)).slice(0, 10);
-        
+
         setSuggestions(names);
         setShowSuggestions(names.length > 0);
         setSuggIndex(-1);
@@ -127,7 +126,7 @@ export default function GeneralStockPage() {
     return [...items].sort((a, b) => {
       const aVal = a[sortConfig.key];
       const bVal = b[sortConfig.key];
-      const col  = COLUMNS.find((c) => c.key === sortConfig.key);
+      const col = COLUMNS.find((c) => c.key === sortConfig.key);
       let cmp = 0;
       if (col?.type === "number") {
         cmp = parseFloat(aVal) - parseFloat(bVal);
@@ -365,11 +364,10 @@ export default function GeneralStockPage() {
                         setShowSuggestions(false);
                         setSuggIndex(-1);
                       }}
-                      className={`px-4 py-2 text-sm cursor-pointer transition-colors ${
-                        idx === suggIndex
-                          ? "bg-cyan-100 text-cyan-900"
-                          : "hover:bg-gray-50 text-gray-800"
-                      }`}
+                      className={`px-4 py-2 text-sm cursor-pointer transition-colors ${idx === suggIndex
+                        ? "bg-cyan-100 text-cyan-900"
+                        : "hover:bg-gray-50 text-gray-800"
+                        }`}
                     >
                       {name}
                     </li>
@@ -423,11 +421,10 @@ export default function GeneralStockPage() {
               <div
                 key={item.id}
                 data-row
-                className={`border-b border-gray-100 transition-colors cursor-pointer ${
-                  highlightedRow === index
-                    ? "bg-theme-100 ring-1 ring-inset ring-theme-300"
-                    : "hover:bg-theme-100"
-                }`}
+                className={`border-b border-gray-100 transition-colors cursor-pointer ${highlightedRow === index
+                  ? "bg-theme-100 ring-1 ring-inset ring-theme-300"
+                  : "hover:bg-theme-100"
+                  }`}
                 onClick={() => setHighlightedRow(index)}
                 onDoubleClick={() => openDialog(item.id)}
               >
@@ -442,13 +439,12 @@ export default function GeneralStockPage() {
                   <div className="col-span-1 text-gray-600 truncate">{item.brand}</div>
                   <div className="col-span-1 text-gray-600 truncate">{item.subcategory}</div>
                   <div className="col-span-1 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      item.quantity < 10
-                        ? "bg-red-100 text-red-800"
-                        : item.quantity < 30
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.quantity < 10
+                      ? "bg-red-100 text-red-800"
+                      : item.quantity < 30
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-green-100 text-green-800"
+                      }`}>
                       {item.quantity}
                     </span>
                   </div>
