@@ -19,3 +19,10 @@ frontend/dist/
 # ── misc legacy ignores ───────────────────────────────────────────
 data/
 learned/
+
+
+pgsql/
+cude/
+dist_installer/
+context/
+node_modules

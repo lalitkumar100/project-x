@@ -1,0 +1,81 @@
+/* Base Loader Dimensions */
+.cude-loader {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Center Cube */
+.cude-loader .cube {
+  width: 80px;
+  height: 80px;
+  position: absolute;
+  z-index: 5;
+  object-fit: contain;
+  border: none;
+  outline: none;
+}
+
+/* Rotating Ring Wrapper */
+.cude-loader .ring-wrapper {
+  position: absolute;
+  width: 280px;
+  height: 330px;
+  transform-origin: center;
+  
+  /* 
+   * 120s total: 
+   * Starts slow, accelerates for 1 minute (to max speed), 
+   * then decelerates for 1 minute back to slow.
+   */
+  animation: rotateClockwiseVariable 120s ease-in-out infinite;
+}
+
+.cude-loader .ring {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: none;
+  outline: none;
+}
+
+@keyframes rotateClockwiseVariable {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    /* 60 full rotations over 2 minutes */
+    transform: rotate(21600deg);
+  }
+}
+
+/* Optional smooth pulsing glow */
+.cude-loader::after {
+  content: "";
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(111, 255, 111, 0.12);
+  filter: blur(30px);
+  animation: pulseGlow 5s ease-in-out infinite;
+  z-index: 0;
+}
+
+@keyframes pulseGlow {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.4;
+  }
+}

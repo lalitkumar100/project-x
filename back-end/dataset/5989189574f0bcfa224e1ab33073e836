@@ -1,0 +1,53 @@
+week_date,item_id,units_sold,season,avg_temp,rain_days,event_name,event_window,promotion,price,last_week_sales,season_weight,event_weight
+2024-01-07,BAJAJ_FAN01,38,winter,15,0,none,none,0,2800,35,0.95,0.05
+2024-01-14,BAJAJ_FAN01,40,winter,16,0,none,none,0,2800,38,0.95,0.05
+2024-01-21,BAJAJ_FAN01,42,winter,16,0,none,none,0,2800,40,0.95,0.05
+2024-01-28,BAJAJ_FAN01,45,winter,17,0,Republic Day,after,1,2750,42,0.95,0.15
+2024-02-04,BAJAJ_FAN01,55,spring,22,0,none,none,0,2800,45,0.90,0.10
+2024-02-11,BAJAJ_FAN01,60,spring,24,0,none,none,0,2800,55,0.90,0.10
+2024-02-18,BAJAJ_FAN01,68,spring,25,0,none,none,0,2800,60,0.90,0.10
+2024-02-25,BAJAJ_FAN01,72,spring,26,0,none,none,1,2750,68,0.90,0.10
+2024-03-03,BAJAJ_FAN01,85,summer,30,0,none,none,1,2700,72,0.92,0.10
+2024-03-10,BAJAJ_FAN01,95,summer,33,0,Holi,before,1,2680,85,0.93,0.20
+2024-03-17,BAJAJ_FAN01,120,summer,35,0,Holi,during,1,2650,95,0.94,0.30
+2024-03-24,BAJAJ_FAN01,110,summer,36,0,Holi,after,0,2700,120,0.94,0.15
+2024-03-31,BAJAJ_FAN01,125,summer,37,0,none,none,1,2650,110,0.95,0.10
+2024-04-07,BAJAJ_FAN01,150,summer,39,0,none,none,1,2600,125,0.96,0.10
+2024-04-14,BAJAJ_FAN01,170,summer,40,0,none,none,1,2580,150,0.96,0.10
+2024-04-21,BAJAJ_FAN01,185,summer,41,0,none,none,1,2550,170,0.97,0.10
+2024-04-28,BAJAJ_FAN01,200,summer,42,0,none,none,1,2520,185,0.97,0.10
+2024-05-05,BAJAJ_FAN01,220,summer,43,1,none,none,1,2500,200,0.98,0.10
+2024-05-12,BAJAJ_FAN01,235,summer,44,1,none,none,1,2480,220,0.98,0.10
+2024-05-19,BAJAJ_FAN01,250,summer,45,0,none,none,1,2450,235,0.99,0.10
+2024-05-26,BAJAJ_FAN01,260,summer,45,0,none,none,1,2450,250,0.99,0.10
+2024-06-02,BAJAJ_FAN01,240,monsoon,34,2,none,none,0,2600,260,0.80,0.10
+2024-06-09,BAJAJ_FAN01,225,monsoon,32,3,none,none,0,2620,240,0.78,0.10
+2024-06-16,BAJAJ_FAN01,210,monsoon,31,4,none,none,0,2650,225,0.76,0.10
+2024-06-23,BAJAJ_FAN01,195,monsoon,30,5,none,none,0,2680,210,0.75,0.10
+2024-06-30,BAJAJ_FAN01,185,monsoon,29,5,none,none,0,2700,195,0.74,0.10
+2024-07-07,BAJAJ_FAN01,175,monsoon,29,6,none,none,0,2700,185,0.72,0.10
+2024-07-14,BAJAJ_FAN01,168,monsoon,28,5,none,none,0,2720,175,0.72,0.10
+2024-07-21,BAJAJ_FAN01,160,monsoon,28,6,none,none,0,2720,168,0.71,0.10
+2024-07-28,BAJAJ_FAN01,155,monsoon,27,6,none,none,0,2750,160,0.70,0.10
+2024-08-04,BAJAJ_FAN01,150,monsoon,27,5,Raksha Bandhan,before,1,2700,155,0.70,0.20
+2024-08-11,BAJAJ_FAN01,170,monsoon,28,4,Raksha Bandhan,during,1,2680,150,0.70,0.30
+2024-08-18,BAJAJ_FAN01,160,monsoon,28,5,Raksha Bandhan,after,0,2720,170,0.70,0.15
+2024-08-25,BAJAJ_FAN01,155,monsoon,29,4,none,none,0,2750,160,0.72,0.10
+2024-09-01,BAJAJ_FAN01,160,autumn,30,3,none,none,0,2750,155,0.74,0.10
+2024-09-08,BAJAJ_FAN01,180,autumn,31,2,Ganesh Chaturthi,before,1,2700,160,0.75,0.25
+2024-09-15,BAJAJ_FAN01,210,autumn,31,1,Ganesh Chaturthi,during,1,2650,180,0.76,0.35
+2024-09-22,BAJAJ_FAN01,190,autumn,30,1,Ganesh Chaturthi,after,0,2700,210,0.75,0.20
+2024-09-29,BAJAJ_FAN01,185,autumn,30,1,none,none,0,2720,190,0.75,0.10
+2024-10-06,BAJAJ_FAN01,210,autumn,29,1,Diwali,before,1,2650,185,0.76,0.40
+2024-10-13,BAJAJ_FAN01,250,autumn,29,0,Diwali,during,1,2550,210,0.77,0.55
+2024-10-20,BAJAJ_FAN01,230,autumn,28,0,Diwali,after,0,2650,250,0.76,0.30
+2024-10-27,BAJAJ_FAN01,200,autumn,27,0,none,none,0,2700,230,0.72,0.10
+2024-11-03,BAJAJ_FAN01,160,autumn,25,0,none,none,0,2750,200,0.65,0.10
+2024-11-10,BAJAJ_FAN01,140,autumn,24,0,none,none,0,2780,160,0.62,0.10
+2024-11-17,BAJAJ_FAN01,120,winter,22,0,none,none,0,2800,140,0.85,0.10
+2024-11-24,BAJAJ_FAN01,100,winter,20,0,none,none,0,2800,120,0.88,0.10
+2024-12-01,BAJAJ_FAN01,85,winter,18,0,Christmas,before,1,2750,100,0.90,0.20
+2024-12-08,BAJAJ_FAN01,110,winter,17,0,Christmas,during,1,2700,85,0.90,0.30
+2024-12-15,BAJAJ_FAN01,95,winter,16,0,Christmas,after,0,2750,110,0.92,0.15
+2024-12-22,BAJAJ_FAN01,70,winter,15,0,none,none,0,2800,95,0.94,0.05
+2024-12-29,BAJAJ_FAN01,60,winter,15,0,New Year,before,1,2780,70,0.95,0.10

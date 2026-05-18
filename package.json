@@ -1,0 +1,41 @@
+{
+  "name": "tradecore-desktop",
+  "version": "1.0.0",
+  "description": "TradeCore Desktop Application (Electron Wrapper)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "Lalit Kumar Choudhary",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^29.4.6",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.tradecore.desktop",
+    "productName": "TradeCore",
+    "directories": {
+      "output": "dist_installer"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "main.js",
+      "back-end/**/*",
+      "central-server/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "pgsql",
+        "to": "pgsql",
+        "filter": ["**/*"]
+      }
+    ]
+  }
+}
