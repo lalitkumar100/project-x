@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useForm, useFieldArray } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useTCGCall } from "@/hooks/tcg_call";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,10 +67,12 @@ async function fetchItemDetails(itemId, token) {
 
 export default function AddStockPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const token = localStorage.getItem("token");
   const listRefs = useRef({});
   const wholesalerTimer = useRef(null);
   const itemTimer = useRef(null);
+  const autoFetchDone = useRef(false);
 
   const [wholesalerPicked, setWholesalerPicked] = useState(false);
   const [activeWholesalerField, setActiveWholesalerField] = useState("name");
@@ -92,6 +95,16 @@ export default function AddStockPage() {
   const [duplicateWarning, setDuplicateWarning] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(null);
 
+  const tcg = useTCGCall();
+
+  // Invoice Fetch Dialog state
+  const [invoiceFetch, setInvoiceFetch] = useState({
+    open: false,
+    invoiceId: "",
+    phase: "fetching", // "fetching" | "success" | "error"
+    errorMsg: "",
+  });
+
   const wholesalerForm = useForm({
     defaultValues: {
       name: "",
@@ -109,14 +122,13 @@ export default function AddStockPage() {
 
   const itemForm = useForm({
     defaultValues: {
-      item_name: "",
+      name: "",
       brand: "",
-      category: "Tablet",
+      category: "",
       subcategory: "",
-      mrp: "",
-      purchase_price: "",
-      quantity: "",
-      warranty: "",
+      rate: "",
+      buy_price: "",
+      qty: "",
     },
   });
 
@@ -128,14 +140,14 @@ export default function AddStockPage() {
   const grandTotal = useMemo(
     () =>
       fields.reduce(
-        (sum, row) => sum + (Number(row.purchase_price || 0) * Number(row.quantity || 0)),
+        (sum, row) => sum + (Number(row.buy_price || 0) * Number(row.qty || 0)),
         0
       ),
     [fields]
   );
 
   const rowKey = (row) =>
-    `${String(row.item_name).trim().toLowerCase()}|${String(row.brand).trim().toLowerCase()}|${String(row.category).trim().toLowerCase()}`;
+    `${String(row.name).trim().toLowerCase()}|${String(row.brand).trim().toLowerCase()}|${String(row.category).trim().toLowerCase()}`;
 
   const highlightAndScroll = (index) => {
     setHighlightedIndex(index);
@@ -170,7 +182,7 @@ export default function AddStockPage() {
   };
 
   const onItemNameChange = (value) => {
-    itemForm.setValue("item_name", value, { shouldValidate: true, shouldDirty: true });
+    itemForm.setValue("name", value, { shouldValidate: true, shouldDirty: true });
     setSelectedSuggestionId(null);
     if (itemTimer.current) clearTimeout(itemTimer.current);
     if (!value.trim()) {
@@ -189,13 +201,13 @@ export default function AddStockPage() {
   };
 
   const selectItemSuggestion = (entry) => {
-    itemForm.setValue("item_name", entry.name ?? "");
+    itemForm.setValue("name", entry.name ?? "");
     itemForm.setValue("brand", entry.brand ?? "");
-    itemForm.setValue("category", entry.category ?? "Tablet");
+    itemForm.setValue("category", entry.category ?? "");
     itemForm.setValue("subcategory", entry.subcategory ?? "");
     setSelectedSuggestionId(entry.id ?? null);
     if (entry.mrp !== undefined && entry.mrp !== null && entry.mrp !== "") {
-      itemForm.setValue("mrp", String(entry.mrp));
+      itemForm.setValue("rate", String(entry.mrp));
     }
     setShowItemSuggestions(false);
     setItemSuggestionIndex(-1);
@@ -203,19 +215,16 @@ export default function AddStockPage() {
 
   const fillItemFormFromDetails = (details) => {
     if (!details) return;
-    itemForm.setValue("item_name", details.name ?? itemForm.getValues("item_name"));
+    itemForm.setValue("name", details.name ?? itemForm.getValues("name"));
     itemForm.setValue("brand", details.brand ?? "");
     itemForm.setValue("subcategory", details.subcategory ?? "");
-    itemForm.setValue("category", details.category ?? itemForm.getValues("category") ?? "Tablet");
-    if (details.mrp !== undefined && details.mrp !== null) itemForm.setValue("mrp", String(details.mrp));
+    itemForm.setValue("category", details.category ?? itemForm.getValues("category") ?? "");
+    if (details.mrp !== undefined && details.mrp !== null) itemForm.setValue("rate", String(details.mrp));
     if (details.net_buy_price !== undefined && details.net_buy_price !== null) {
-      itemForm.setValue("purchase_price", String(details.net_buy_price));
+      itemForm.setValue("buy_price", String(details.net_buy_price));
     }
     if (details.quantity !== undefined && details.quantity !== null) {
-      itemForm.setValue("quantity", String(details.quantity));
-    }
-    if (details.warranty_months !== undefined && details.warranty_months !== null) {
-      itemForm.setValue("warranty", String(details.warranty_months));
+      itemForm.setValue("qty", String(details.quantity));
     }
   };
 
@@ -234,19 +243,86 @@ export default function AddStockPage() {
 
   const submitWholesaler = () => setWholesalerPicked(true);
 
+  /* ── Reusable invoice fetch logic ── */
+  const fetchInvoiceFromTCG = async (invoiceId) => {
+    if (!invoiceId) return;
+
+    setInvoiceFetch({ open: true, invoiceId, phase: "fetching", errorMsg: "" });
+    wholesalerForm.setValue("invoice_id", invoiceId);
+
+    const { data, status } = await tcg.call({
+      route: "/v1/api/transactions/by-invoice",
+      method: "POST",
+      body: { invoice_no: invoiceId },
+    });
+
+    if (status === 200 && data?.success) {
+      setInvoiceFetch((prev) => ({ ...prev, phase: "success" }));
+      const txData = data.data;
+
+      // Autofill wholesaler info from sender
+      wholesalerForm.setValue("name", txData.sender_info?.name || "");
+      wholesalerForm.setValue("gst_no", txData.sender_info?.gst_no || "");
+
+      // Autofill items from invoice_data
+      const rawItems = txData.invoice_data?.items || (Array.isArray(txData.invoice_data) ? txData.invoice_data : []);
+      invoiceForm.reset({ items: [] });
+      rawItems.forEach((item) => {
+        append({
+          item_id: null,
+          name: item.name || "",
+          brand: item.brand || "",
+          category: item.category || "",
+          subcategory: item.subcategory || "",
+          rate: Number(item.rate || 0),
+          buy_price: Number(item.buy_price || 0),
+          qty: Number(item.qty || 0),
+          total: Number(item.buy_price || 0) * Number(item.qty || 0),
+        });
+      });
+      setWholesalerPicked(true);
+      setTimeout(() => setInvoiceFetch((prev) => ({ ...prev, open: false })), 3000);
+    } else {
+      const errorMsg = data?.message || tcg.error || "Failed to fetch invoice";
+      setInvoiceFetch((prev) => ({ ...prev, phase: "error", errorMsg }));
+    }
+  };
+
+  /* ── Pre-fill invoice_id & billing type from URL query params ── */
+  useEffect(() => {
+    const urlInvoiceId = searchParams.get("invoice_id");
+    if (urlInvoiceId && !autoFetchDone.current) {
+      autoFetchDone.current = true;
+      wholesalerForm.setValue("invoice_id", urlInvoiceId);
+      wholesalerForm.setValue("billing_type", "inter");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  /* ── Invoice ID Enter key → fetch from TCG server ── */
+  const handleInvoiceIdKeyDown = async (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const invoiceId = wholesalerForm.getValues("invoice_id").trim();
+    fetchInvoiceFromTCG(invoiceId);
+  };
+
+  const closeInvoiceFetchDialog = () => {
+    setInvoiceFetch((prev) => ({ ...prev, open: false }));
+  };
+
   const openCreateItemDialog = () => {
     setEditingIndex(null);
     setSelectedSuggestionId(null);
     setDuplicateWarning("");
     itemForm.reset({
-      item_name: "",
+      name: "",
       brand: "",
-      category: "Tablet",
+      category: "",
       subcategory: "",
-      mrp: "",
-      purchase_price: "",
-      quantity: "",
-      warranty: "",
+      rate: "",
+      buy_price: "",
+      qty: "",
     });
     setItemDialogOpen(true);
   };
@@ -257,14 +333,13 @@ export default function AddStockPage() {
     setSelectedSuggestionId(row.item_id ?? null);
     setDuplicateWarning("");
     itemForm.reset({
-      item_name: row.item_name,
+      name: row.name,
       brand: row.brand,
       category: row.category,
       subcategory: row.subcategory,
-      mrp: String(row.mrp),
-      purchase_price: String(row.purchase_price),
-      quantity: String(row.quantity),
-      warranty: row.warranty ? String(row.warranty) : "",
+      rate: String(row.rate),
+      buy_price: String(row.buy_price),
+      qty: String(row.qty),
     });
     setItemDialogOpen(true);
   };
@@ -274,11 +349,10 @@ export default function AddStockPage() {
     const normalized = {
       ...payload,
       item_id: selectedSuggestionId ?? existingItemId,
-      mrp: Number(payload.mrp),
-      purchase_price: Number(payload.purchase_price),
-      quantity: Number(payload.quantity),
-      warranty: payload.warranty ? Number(payload.warranty) : 0,
-      total: Number(payload.purchase_price) * Number(payload.quantity),
+      rate: Number(payload.rate),
+      buy_price: Number(payload.buy_price),
+      qty: Number(payload.qty),
+      total: Number(payload.buy_price) * Number(payload.qty),
     };
 
     const duplicateIndex = fields.findIndex((row, idx) => {
@@ -287,13 +361,9 @@ export default function AddStockPage() {
     });
 
     if (duplicateIndex !== -1) {
-      const existing = fields[duplicateIndex];
-      const sameWarranty = Number(existing.warranty || 0) === Number(normalized.warranty || 0);
       highlightAndScroll(duplicateIndex);
       setDuplicateWarning(
-        sameWarranty
-          ? "This item is already added in the invoice. You can update existing quantity."
-          : "This item already exists. If warranty is different, please update the existing item instead of adding a new one."
+        "This item is already added in the invoice. You can update existing quantity."
       );
       return;
     }
@@ -312,12 +382,12 @@ export default function AddStockPage() {
     const duplicateIndex = fields.findIndex((row) => rowKey(row) === rowKey(values));
     if (duplicateIndex === -1) return;
     const existing = fields[duplicateIndex];
-    const extra = Number(values.quantity || 0);
-    const nextQty = Number(existing.quantity || 0) + extra;
+    const extra = Number(values.qty || 0);
+    const nextQty = Number(existing.qty || 0) + extra;
     update(duplicateIndex, {
       ...existing,
-      quantity: nextQty,
-      total: Number(existing.purchase_price || 0) * nextQty,
+      qty: nextQty,
+      total: Number(existing.buy_price || 0) * nextQty,
     });
     setDuplicateWarning("");
     highlightAndScroll(duplicateIndex);
@@ -328,15 +398,17 @@ export default function AddStockPage() {
     const wholesalerValues = wholesalerForm.getValues();
     const items = fields.map((row) => ({
       item_id: row.item_id ?? null,
-      item_name: row.item_name,
+      item_name: row.name,
       brand: row.brand || "",
       category: row.category || "",
       subcategory: row.subcategory || "",
-      quantity: Number(row.quantity || 0),
-      purchase_price: Number(row.purchase_price || 0),
-      mrp: Number(row.mrp || 0),
-      warranty_months: Number(row.warranty || 0),
-      line_total: Number(row.purchase_price || 0) * Number(row.quantity || 0),
+      qty: Number(row.qty || 0),
+      quantity: Number(row.qty || 0),
+      buy_price: Number(row.buy_price || 0),
+      purchase_price: Number(row.buy_price || 0),
+      rate: Number(row.rate || 0),
+      mrp: Number(row.rate || 0),
+      line_total: Number(row.buy_price || 0) * Number(row.qty || 0),
     }));
 
     return {
@@ -498,10 +570,12 @@ export default function AddStockPage() {
                 placeholder="INV-2026-001"
                 {...wholesalerForm.register("invoice_id", { required: "Invoice ID is required" })}
                 className={wholesalerForm.formState.errors.invoice_id ? "border-red-500" : ""}
+                onKeyDown={handleInvoiceIdKeyDown}
               />
               {wholesalerForm.formState.errors.invoice_id && (
                 <p className="text-xs text-red-600">{wholesalerForm.formState.errors.invoice_id.message}</p>
               )}
+              <p className="text-[11px] text-muted-foreground">Press Enter to fetch invoice from TCG server</p>
             </div>
 
             <div className="space-y-1">
@@ -581,7 +655,8 @@ export default function AddStockPage() {
                         <th className="text-left px-3 py-2">Brand</th>
                         <th className="text-left px-3 py-2">Category</th>
                         <th className="text-left px-3 py-2">Qty</th>
-                        <th className="text-left px-3 py-2">Purchase Price</th>
+                        <th className="text-left px-3 py-2">Rate</th>
+                        <th className="text-left px-3 py-2">Buy Price</th>
                         <th className="text-left px-3 py-2">Total</th>
                         <th className="text-left px-3 py-2">Actions</th>
                       </tr>
@@ -595,12 +670,13 @@ export default function AddStockPage() {
                           }}
                           className={`border-t ${highlightedIndex === index ? "bg-yellow-100" : ""}`}
                         >
-                          <td className="px-3 py-2">{row.item_name}</td>
+                          <td className="px-3 py-2">{row.name}</td>
                           <td className="px-3 py-2">{row.brand || "-"}</td>
                           <td className="px-3 py-2">{row.category || "-"}</td>
-                          <td className="px-3 py-2">{row.quantity}</td>
-                          <td className="px-3 py-2">₹{Number(row.purchase_price).toFixed(2)}</td>
-                          <td className="px-3 py-2">₹{(Number(row.purchase_price) * Number(row.quantity)).toFixed(2)}</td>
+                          <td className="px-3 py-2">{row.qty}</td>
+                          <td className="px-3 py-2">₹{Number(row.rate).toFixed(2)}</td>
+                          <td className="px-3 py-2">₹{Number(row.buy_price).toFixed(2)}</td>
+                          <td className="px-3 py-2">₹{(Number(row.buy_price) * Number(row.qty)).toFixed(2)}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
                               <Button size="sm" variant="outline" onClick={() => openEditItemDialog(index)}>
@@ -644,11 +720,11 @@ export default function AddStockPage() {
           <form onSubmit={itemForm.handleSubmit(onItemSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1 relative">
-                <Label htmlFor="item_name">Item Name *</Label>
+                <Label htmlFor="name">Item Name *</Label>
                 <Input
-                  id="item_name"
+                  id="name"
                   autoComplete="off"
-                  {...itemForm.register("item_name", { required: "Item name is required" })}
+                  {...itemForm.register("name", { required: "Item name is required" })}
                   onChange={(e) => onItemNameChange(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowDown" && showItemSuggestions) {
@@ -670,10 +746,10 @@ export default function AddStockPage() {
                       fetchAndFillItemDetails(selectedSuggestionId);
                     }
                   }}
-                  className={itemForm.formState.errors.item_name ? "border-red-500" : ""}
+                  className={itemForm.formState.errors.name ? "border-red-500" : ""}
                 />
-                {itemForm.formState.errors.item_name && (
-                  <p className="text-xs text-red-600">{itemForm.formState.errors.item_name.message}</p>
+                {itemForm.formState.errors.name && (
+                  <p className="text-xs text-red-600">{itemForm.formState.errors.name.message}</p>
                 )}
                 {selectedSuggestionId ? (
                   <p className="text-xs text-cyan-700">Press Enter again to fetch full item details.</p>
@@ -715,17 +791,7 @@ export default function AddStockPage() {
 
               <div className="space-y-1">
                 <Label htmlFor="category">Category</Label>
-                <select
-                  id="category"
-                  className="h-9 w-full rounded-md border px-3 text-sm bg-transparent"
-                  {...itemForm.register("category")}
-                >
-                  <option value="Tablet">Tablet</option>
-                  <option value="Capsule">Capsule</option>
-                  <option value="Syrup">Syrup</option>
-                  <option value="Injection">Injection</option>
-                  <option value="Other">Other</option>
-                </select>
+                <Input id="category" placeholder="e.g. Kitchen Appliances" {...itemForm.register("category")} />
               </div>
 
               <div className="space-y-1">
@@ -734,58 +800,53 @@ export default function AddStockPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="mrp">MRP *</Label>
+                <Label htmlFor="rate">Rate (MRP) *</Label>
                 <Input
-                  id="mrp"
+                  id="rate"
                   type="number"
                   step="0.01"
-                  {...itemForm.register("mrp", {
-                    required: "MRP is required",
-                    min: { value: 0.01, message: "MRP should be greater than 0" },
+                  {...itemForm.register("rate", {
+                    required: "Rate is required",
+                    min: { value: 0.01, message: "Rate should be greater than 0" },
                   })}
-                  className={itemForm.formState.errors.mrp ? "border-red-500" : ""}
+                  className={itemForm.formState.errors.rate ? "border-red-500" : ""}
                 />
-                {itemForm.formState.errors.mrp && (
-                  <p className="text-xs text-red-600">{itemForm.formState.errors.mrp.message}</p>
+                {itemForm.formState.errors.rate && (
+                  <p className="text-xs text-red-600">{itemForm.formState.errors.rate.message}</p>
                 )}
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="purchase_price">Purchase Price *</Label>
+                <Label htmlFor="buy_price">Buy Price *</Label>
                 <Input
-                  id="purchase_price"
+                  id="buy_price"
                   type="number"
                   step="0.01"
-                  {...itemForm.register("purchase_price", {
-                    required: "Purchase price is required",
-                    min: { value: 0.01, message: "Purchase price should be greater than 0" },
+                  {...itemForm.register("buy_price", {
+                    required: "Buy price is required",
+                    min: { value: 0.01, message: "Buy price should be greater than 0" },
                   })}
-                  className={itemForm.formState.errors.purchase_price ? "border-red-500" : ""}
+                  className={itemForm.formState.errors.buy_price ? "border-red-500" : ""}
                 />
-                {itemForm.formState.errors.purchase_price && (
-                  <p className="text-xs text-red-600">{itemForm.formState.errors.purchase_price.message}</p>
+                {itemForm.formState.errors.buy_price && (
+                  <p className="text-xs text-red-600">{itemForm.formState.errors.buy_price.message}</p>
                 )}
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="quantity">Quantity *</Label>
+                <Label htmlFor="qty">Quantity *</Label>
                 <Input
-                  id="quantity"
+                  id="qty"
                   type="number"
-                  {...itemForm.register("quantity", {
+                  {...itemForm.register("qty", {
                     required: "Quantity is required",
                     min: { value: 1, message: "Quantity should be greater than 0" },
                   })}
-                  className={itemForm.formState.errors.quantity ? "border-red-500" : ""}
+                  className={itemForm.formState.errors.qty ? "border-red-500" : ""}
                 />
-                {itemForm.formState.errors.quantity && (
-                  <p className="text-xs text-red-600">{itemForm.formState.errors.quantity.message}</p>
+                {itemForm.formState.errors.qty && (
+                  <p className="text-xs text-red-600">{itemForm.formState.errors.qty.message}</p>
                 )}
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="warranty">Warranty (months)</Label>
-                <Input id="warranty" type="number" {...itemForm.register("warranty")} />
               </div>
             </div>
 
@@ -828,6 +889,168 @@ export default function AddStockPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── TCG Invoice Fetch Dialog ── */}
+      {invoiceFetch.open && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(10px) brightness(0.5)",
+            WebkitBackdropFilter: "blur(10px) brightness(0.5)",
+            backgroundColor: "rgba(0,0,20,0.5)",
+            animation: "tcgif-fade 0.25s ease",
+          }}
+          onClick={closeInvoiceFetchDialog}
+        >
+          <style>{`
+            @keyframes tcgif-fade   { from { opacity:0 } to { opacity:1 } }
+            @keyframes tcgif-slide  { from { opacity:0; transform:translateY(24px) scale(0.96) } to { opacity:1; transform:translateY(0) scale(1) } }
+            @keyframes tcgif-spin   { to { transform: rotate(360deg) } }
+            @keyframes tcgif-pulse  { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+            @keyframes tcgif-arrow  { 0%,100% { transform:translateX(0) } 50% { transform:translateX(6px) } }
+            @keyframes tcgif-bounce { 0%,100% { transform:scale(1) } 50% { transform:scale(1.12) } }
+            .tcgif-card { animation: tcgif-slide 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+            .tcgif-arrow-anim { animation: tcgif-arrow 1s ease-in-out infinite; }
+            .tcgif-spin { animation: tcgif-spin 1.4s linear infinite; }
+            .tcgif-pulse { animation: tcgif-pulse 1.5s ease-in-out infinite; }
+            .tcgif-success-bounce { animation: tcgif-bounce 0.4s ease; }
+          `}</style>
+
+          <div
+            className="tcgif-card"
+            style={{
+              background: "linear-gradient(135deg, #f8faff 0%, #eef2ff 100%)",
+              borderRadius: "24px",
+              width: "100%", maxWidth: "460px", margin: "16px",
+              boxShadow: "0 32px 80px rgba(0,0,40,0.35), 0 0 0 1px rgba(99,102,241,0.15)",
+              overflow: "hidden",
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top accent bar */}
+            <div style={{
+              height: "4px",
+              background: "linear-gradient(90deg, #4f46e5 0%, #dc2626 50%, #4f46e5 100%)",
+            }} />
+
+            <div style={{ padding: "36px 36px 32px" }}>
+              {/* Logos row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", marginBottom: "28px" }}>
+                {/* Your logo */}
+                <div style={{
+                  background: "white", borderRadius: "16px", padding: "10px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                  border: "1px solid #e0e7ff",
+                }}>
+                  <img src="/assets/log1.png" alt="Company Logo"
+                    style={{ width: "64px", height: "64px", objectFit: "contain", display: "block" }} />
+                </div>
+
+                {/* Animated arrow */}
+                <div className="tcgif-arrow-anim" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                  <svg width="40" height="16" viewBox="0 0 40 16" fill="none">
+                    <path d="M0 8 H32" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d="M28 2 L38 8 L28 14" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span style={{ fontSize: "9px", color: "#6366f1", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" }}>TCG</span>
+                </div>
+
+                {/* TCG logo */}
+                <div style={{
+                  background: "white", borderRadius: "16px", padding: "10px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                  border: "1px solid #fecaca",
+                }}>
+                  <img src="/PROJECT-X/TCG_logo.png" alt="TCG Logo"
+                    style={{ width: "64px", height: "64px", objectFit: "contain", display: "block" }} />
+                </div>
+              </div>
+
+              {/* Status section */}
+              <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "6px", fontWeight: 500 }}>
+                  Fetching invoice from TCG Server
+                </p>
+                <p style={{
+                  fontFamily: "monospace", fontSize: "15px", fontWeight: 700,
+                  color: "#4f46e5", background: "#eef2ff",
+                  padding: "6px 14px", borderRadius: "8px", display: "inline-block",
+                  border: "1px solid #c7d2fe", marginBottom: "24px", letterSpacing: "0.5px",
+                }}>
+                  {invoiceFetch.invoiceId}
+                </p>
+
+                {/* Phase indicator */}
+                {invoiceFetch.phase === "fetching" && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                    <svg className="tcgif-spin" width="42" height="42" viewBox="0 0 42 42" fill="none">
+                      <circle cx="21" cy="21" r="18" stroke="#e0e7ff" strokeWidth="4" />
+                      <path d="M21 3 A18 18 0 0 1 39 21" stroke="#4f46e5" strokeWidth="4" strokeLinecap="round" />
+                    </svg>
+                    <p className="tcgif-pulse" style={{ fontSize: "14px", color: "#4f46e5", fontWeight: 600 }}>
+                      Contacting TradeChainGuardian…
+                    </p>
+                    <p style={{ fontSize: "12px", color: "#9ca3af" }}>Verifying invoice ID and fetching data</p>
+                  </div>
+                )}
+
+                {invoiceFetch.phase === "success" && (
+                  <div className="tcgif-success-bounce" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                    <div style={{
+                      width: "56px", height: "56px", borderRadius: "50%",
+                      background: "linear-gradient(135deg, #d1fae5, #a7f3d0)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid #6ee7b7",
+                    }}>
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <path d="M5 14 L11 20 L23 8" stroke="#059669" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <p style={{ fontSize: "15px", fontWeight: 700, color: "#059669" }}>Invoice Fetched Successfully!</p>
+                    <p style={{ fontSize: "12px", color: "#6b7280" }}>Invoice data is ready. You can now proceed.</p>
+                  </div>
+                )}
+
+                {invoiceFetch.phase === "error" && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                    <div style={{
+                      width: "56px", height: "56px", borderRadius: "50%",
+                      background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid #fca5a5",
+                    }}>
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <path d="M8 8 L20 20 M20 8 L8 20" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <p style={{ fontSize: "15px", fontWeight: 700, color: "#dc2626" }}>Fetch Failed</p>
+                    <p style={{ fontSize: "12px", color: "#6b7280" }}>{invoiceFetch.errorMsg || "Unable to contact TCG server."}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Close button */}
+              <div style={{ marginTop: "28px", display: "flex", justifyContent: "center" }}>
+                <button
+                  onClick={closeInvoiceFetchDialog}
+                  style={{
+                    padding: "10px 28px", borderRadius: "10px",
+                    border: "1.5px solid #e0e7ff",
+                    background: "white", cursor: "pointer",
+                    fontSize: "14px", fontWeight: 600, color: "#6b7280",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f3ff"; e.currentTarget.style.borderColor = "#a5b4fc"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "white"; e.currentTarget.style.borderColor = "#e0e7ff"; }}
+                >
+                  {invoiceFetch.phase === "success" ? "✓ Done" : "Close"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

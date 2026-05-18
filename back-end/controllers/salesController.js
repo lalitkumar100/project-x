@@ -2,7 +2,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const {
   createRetailSale,
   createWholesaleSale,
-  createWholesalerSale
+  createWholesalerSale,
+  resolveRequestItems
 } = require('../services/salesService');
 
 const createRetailSaleController = asyncHandler(async (req, res) => {
@@ -32,8 +33,15 @@ const createWholesaleSaleController = asyncHandler(async (req, res) => {
   });
 });
 
+const resolveRequestController = asyncHandler(async (req, res) => {
+  const { items } = req.body;
+  const result = await resolveRequestItems(items);
+  res.status(200).json(result);
+});
+
 module.exports = {
   createRetailSaleController,
   createWholesalerSaleController,
-  createWholesaleSaleController
+  createWholesaleSaleController,
+  resolveRequestController
 };

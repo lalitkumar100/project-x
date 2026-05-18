@@ -89,13 +89,13 @@ function MobileCard({ item, onViewDetails }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function WholesalerReportPage() {
   const navigate = useNavigate();
-  const goToDetails = (id) => navigate(`/admin/reports/Wholesaler/${id}`);
+  const goToDetails = (id) => navigate(`/report/Wholesaler/${id}`);
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button
-          onClick={() => navigate("/admin/report/wholesaler/add")}
+          onClick={() => navigate("/report/wholesaler/add")}
           className="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
           Add New Wholesaler

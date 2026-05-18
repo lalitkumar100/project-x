@@ -11,47 +11,47 @@ import TCGLoginDialog from "@/components/TCGLoginDialog";
 // Breadcrumb configuration for each route
 const BREADCRUMB_CONFIG = {
   "/dashboard": {
-    items: [{ label: "PharmaDesk", href: "/dashboard" }],
+    items: [{ label: "TradeCore", href: "/dashboard" }],
     currentPage: "Dashboard"
   },
   "/addstock": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Inventory",  href: "/stock" }
     ],
     currentPage: "Add Stock"
   },
   "/stock": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Inventory",  href: "/stock" }
     ],
     currentPage: "Stock Management"
   },
   "/billing": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Billing",    href: "/billing" }
     ],
     currentPage: "New Sale"
   },
   "/report": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Reports",    href: "/report" }
     ],
     currentPage: "Reports"
   },
   "/report/wholesaler": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Reports",    href: "/report" }
     ],
     currentPage: "Wholesaler Report"
   },
   "/report/wholesaler/add": {
     items: [
-      { label: "PharmaDesk",  href: "/dashboard" },
+      { label: "TradeCore",  href: "/dashboard" },
       { label: "Reports",     href: "/report" },
       { label: "Wholesalers", href: "/report/wholesaler" }
     ],
@@ -59,14 +59,14 @@ const BREADCRUMB_CONFIG = {
   },
   "/report/transaction": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Reports",    href: "/report" }
     ],
     currentPage: "TCG Transactions"
   },
   "/report/request": {
     items: [
-      { label: "PharmaDesk", href: "/dashboard" },
+      { label: "TradeCore", href: "/dashboard" },
       { label: "Reports",    href: "/report" }
     ],
     currentPage: "TCG Requests"
@@ -85,7 +85,7 @@ export default function MainLayout() {
   // Authentication check
   React.useEffect(() => {
     const token = localStorage.getItem("token");
-   
+    // No auth token check redirect here to prevent routing loops
   }, [navigate]);
 
   // Get breadcrumb config for current route
@@ -94,7 +94,7 @@ export default function MainLayout() {
     if (location.pathname.startsWith("/stock/update/")) {
       return {
         items: [
-          { label: "PharmaDesk", href: "/dashboard" },
+          { label: "TradeCore", href: "/dashboard" },
           { label: "Inventory", href: "/stock" },
            { label: "update", href: "/stock/update" }
         ],
@@ -104,7 +104,7 @@ export default function MainLayout() {
 
     // Return config for static routes
     return BREADCRUMB_CONFIG[location.pathname] || {
-      items: [{ label: "PharmaDesk", href: "/dashboard" }],
+      items: [{ label: "TradeCore", href: "/dashboard" }],
       currentPage: "Page"
     };
   };
@@ -132,13 +132,7 @@ export default function MainLayout() {
           </div>
 
           {/* Floating Shell Button */}
-          <button
-            className="fixed bottom-8 right-8 p-2 bg-black text-white rounded-full shadow-lg hover:bg-blue-700 transition-all active:scale-95 z-50 flex items-center justify-center"
-            onClick={() => setIsPanelOpen(true)}
-            aria-label="Open main panel"
-          >
-            <Shell className="h-9 w-9 rounded-full text-blue-600" />
-          </button>
+        
 
           {/* Main Panel */}
           <MainPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} />

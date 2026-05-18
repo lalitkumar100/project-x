@@ -41,6 +41,9 @@ export default function TCGLoginPage() {
 
       if (data.success && data.token) {
         localStorage.setItem("tcg_token", data.token);
+        if (data.business_name) {
+          localStorage.setItem("business_name", data.business_name);
+        }
         toast.success("TCG connected!", {
           description: "TradeChainGuardian session is now active.",
         });

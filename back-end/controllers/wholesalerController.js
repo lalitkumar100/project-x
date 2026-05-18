@@ -29,7 +29,7 @@ const searchWholesalers = asyncHandler(async (req, res) => {
   } else {
     query = `
       SELECT * 
-      FROM wholesaler_list 
+      FROM wholesaler_all 
       WHERE 
         name ILIKE $1 OR 
         city ILIKE $2 OR 

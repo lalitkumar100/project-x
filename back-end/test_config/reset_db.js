@@ -37,6 +37,7 @@ CREATE SEQUENCE IF NOT EXISTS customer_phones_id_seq    START 1 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS customers_id_seq          START 1 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS employees_id_seq          START 1 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS items_id_seq              START 1 INCREMENT 1;
+CREATE SEQUENCE IF NOT EXISTS item_datasets_id_seq      START 1 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS purchase_items_id_seq     START 1 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS purchases_id_seq          START 1 INCREMENT 1;
 CREATE SEQUENCE IF NOT EXISTS replacement_items_id_seq  START 1 INCREMENT 1;
@@ -174,6 +175,17 @@ CREATE TABLE items (
   CONSTRAINT items_subcategory_id_fkey FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL
 );
 
+CREATE TABLE item_datasets (
+  id           INTEGER NOT NULL DEFAULT nextval('item_datasets_id_seq'),
+  item_id      INTEGER NOT NULL,
+  dataset_name VARCHAR(255) NOT NULL,
+  dataset_path TEXT NOT NULL,
+  uploaded_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT item_datasets_pkey PRIMARY KEY (id),
+  CONSTRAINT item_datasets_item_id_key UNIQUE (item_id),
+  CONSTRAINT item_datasets_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);
+
 CREATE TABLE purchases (
   id             INTEGER      NOT NULL DEFAULT nextval('purchases_id_seq'),
   wholesaler_id  INTEGER,
@@ -225,6 +237,8 @@ CREATE TABLE sales (
   total_box      INTEGER,
   status         VARCHAR(50),
   created_at     TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+  blockchain_status VARCHAR(10),
+  blockchain_txn_id VARCHAR(10),
   CONSTRAINT sales_pkey              PRIMARY KEY (id),
   CONSTRAINT sales_customer_id_fkey  FOREIGN KEY (customer_id)    REFERENCES customers(id),
   CONSTRAINT sales_employee_id_fkey  FOREIGN KEY (employee_id)    REFERENCES employees(id),
@@ -358,6 +372,15 @@ async function run() {
   console.log("\n⏳ Applying new schema …");
   await client.query(NEW_SCHEMA_SQL);
   console.log("🏗️  Schema created successfully.\n");
+
+  console.log("🌱 Seeding default Unregistered customer...");
+  await client.query(`
+    INSERT INTO customers (id, name)
+    VALUES (1, 'Unregistered')
+    ON CONFLICT (id) DO NOTHING
+  `);
+  await client.query(`SELECT setval('customers_id_seq', COALESCE((SELECT MAX(id) FROM customers), 1), true)`);
+  console.log("✅ Seed complete.\n");
 
   /* 3. Summary */
   const { rows } = await client.query(`

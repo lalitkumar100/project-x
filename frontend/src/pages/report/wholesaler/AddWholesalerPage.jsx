@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Save, Store } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Store, Search } from "lucide-react";
 import { toast } from "sonner";
+import { useTCGCall } from "@/hooks/tcg_call";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,13 +31,46 @@ export default function AddWholesalerPage() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const [submitting, setSubmitting] = useState(false);
+  const [tcgId, setTcgId] = useState("");
+  const [tcgFetching, setTcgFetching] = useState(false);
+  const tcg = useTCGCall();
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm({ defaultValues });
+
+  /* ── Fetch wholesaler details from TCG server by user ID ── */
+  const fetchFromTCG = async () => {
+    const id = tcgId.trim();
+    if (!id) return;
+    setTcgFetching(true);
+    const { data, status } = await tcg.call({ route: `/v1/api/users/${id}` });
+    if (status === 200 && data) {
+      const u = data.data ?? data;
+      setValue("name", u.business_name || "");
+      setValue("email", u.email || "");
+      setValue("gst_no", u.gst_number || "");
+      setValue("primary_phone", u.phone || u.phone_primary || "");
+      if (u.address) {
+        setValue("address_line", u.address);
+      }
+      toast.success(`Fetched details for TCG user #${id}`);
+    } else {
+      toast.error(tcg.error || "Failed to fetch TCG user details.");
+    }
+    setTcgFetching(false);
+  };
+
+  const handleTcgIdKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      fetchFromTCG();
+    }
+  };
 
   const addressFields = watch(["address_line", "city", "state", "pincode", "address_label"]);
   const hasAnyAddressInput = addressFields.some((value) => String(value || "").trim().length > 0);
@@ -74,7 +108,7 @@ export default function AddWholesalerPage() {
       });
 
       toast.success("Wholesaler created successfully.");
-      navigate("/admin/report/wholesaler");
+      navigate("/report/wholesaler");
     } catch (error) {
       const message = error?.response?.data?.message || "Failed to add wholesaler.";
       toast.error(message);
@@ -109,6 +143,25 @@ export default function AddWholesalerPage() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+          {/* TCG Import Section */}
+          <div className="rounded-lg border border-dashed border-indigo-300 bg-indigo-50/40 p-4">
+            <Label className="text-xs font-semibold text-indigo-700 mb-2 block">Import from TCG Server</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Enter TCG User ID (e.g. 2)"
+                value={tcgId}
+                onChange={(e) => setTcgId(e.target.value)}
+                onKeyDown={handleTcgIdKeyDown}
+                className="max-w-xs"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={fetchFromTCG} disabled={tcgFetching || !tcgId.trim()}>
+                {tcgFetching ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
+                Fetch
+              </Button>
+            </div>
+            <p className="text-[11px] text-indigo-500 mt-1.5">Enter a TCG user ID and press Enter or click Fetch to auto-fill details.</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Name *</Label>
@@ -220,8 +273,10 @@ export default function AddWholesalerPage() {
                   aria-invalid={!!errors.address_line}
                   className={errors.address_line ? "border-red-500" : ""}
                   {...register("address_line", {
-                    validate: (value) =>
-                      !hasAnyAddressInput || value.trim() || "Address line is required when address is provided",
+                    validate: (value) => {
+                      if (!hasAnyAddressInput) return true;
+                      return (value && value.trim()) ? true : "Address line is required when address is provided";
+                    }
                   })}
                 />
                 {errors.address_line ? (
@@ -236,7 +291,10 @@ export default function AddWholesalerPage() {
                   aria-invalid={!!errors.city}
                   className={errors.city ? "border-red-500" : ""}
                   {...register("city", {
-                    validate: (value) => !hasAnyAddressInput || value.trim() || "City is required",
+                    validate: (value) => {
+                      if (!hasAnyAddressInput) return true;
+                      return (value && value.trim()) ? true : "City is required";
+                    }
                   })}
                 />
                 {errors.city ? <p className="text-xs text-red-600 mt-1">{errors.city.message}</p> : null}
@@ -249,7 +307,10 @@ export default function AddWholesalerPage() {
                   aria-invalid={!!errors.state}
                   className={errors.state ? "border-red-500" : ""}
                   {...register("state", {
-                    validate: (value) => !hasAnyAddressInput || value.trim() || "State is required",
+                    validate: (value) => {
+                      if (!hasAnyAddressInput) return true;
+                      return (value && value.trim()) ? true : "State is required";
+                    }
                   })}
                 />
                 {errors.state ? <p className="text-xs text-red-600 mt-1">{errors.state.message}</p> : null}
@@ -280,7 +341,10 @@ export default function AddWholesalerPage() {
                   aria-invalid={!!errors.address_label}
                   className={errors.address_label ? "border-red-500" : ""}
                   {...register("address_label", {
-                    validate: (value) => !hasAnyAddressInput || value.trim() || "Address label is required",
+                    validate: (value) => {
+                      if (!hasAnyAddressInput) return true;
+                      return (value && value.trim()) ? true : "Address label is required";
+                    }
                   })}
                 />
                 {errors.address_label ? (

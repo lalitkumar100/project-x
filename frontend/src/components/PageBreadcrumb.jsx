@@ -11,13 +11,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { User } from "lucide-react"
+import { User, Store } from "lucide-react"
 
 export default function PageBreadcrumb({
   items = [],
   showSidebarTrigger = true,
 }) {
   const navigate = useNavigate()
+
+  const businessName = localStorage.getItem("business_name")
 
   return (
     <header className="flex w-full h-16 items-center justify-between px-4 transition-[width,height] ease-linear group-has-[data-collapsible=icon]/sidebar-wrapper:h-12">
@@ -53,15 +55,16 @@ export default function PageBreadcrumb({
       </div>
 
       {/* RIGHT */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => navigate("/profile")}
-        className="rounded-full h-10 w-10 bg-linear-to-br from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white"
-        aria-label="Go to profile"
-      >
-        <User className="h-5 w-5" />
-      </Button>
+      <div className="flex items-center gap-3">
+        {businessName && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-linear-to-br from-cyan-500/10 to-teal-500/10 border border-cyan-500/20 text-cyan-800 font-semibold text-xs shadow-xs animate-fade-in">
+            {/* The present icon representing the business profile */}
+            <Store className="h-4 w-4 text-cyan-600 animate-pulse" />
+            <span>{businessName}</span>
+          </div>
+        )}
+        
+      </div>
     </header>
   )
 }

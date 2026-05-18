@@ -15,6 +15,7 @@ import {
   SendHorizonal,
   Inbox,
   ShieldAlert,
+  ArrowLeft,
 } from "lucide-react";
 
 import { Button }   from "@/components/ui/button";
@@ -83,9 +84,10 @@ export default function RequestReportPage() {
   /* ── Fetch ────────────────────────────────────── */
   const fetchRequests = async (type) => {
     const res = await call({ route: `/v1/api/requests?type=${type}` });
-    if (res && Array.isArray(res.data)) {
-      setRows(res.data);
-    } else if (res && res.error) {
+    
+    if (res && res.data && Array.isArray(res.data.data)) {
+      setRows(res.data.data);
+    } else if (res && res.status === 401) {
       openTCGLogin();
     }
     setFetched(true);
@@ -145,12 +147,23 @@ export default function RequestReportPage() {
 
   /* ═══════════════════════════════════════════════ */
   return (
-    <div className="flex flex-1 flex-col gap-5 p-4 pt-0">
+    <div className="flex flex-1 flex-col bg-theme-50 gap-6 p-4 max-w-7xl mx-auto w-full">
 
-      <SectionHeader
-        title="TCG Request Report"
-        description="View and search trade requests from the TradeChainGuardian network."
-      />
+      {/* ── Header ── */}
+      <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/report")}
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">TCG Request Report</h1>
+          <p className="text-sm text-muted-foreground">View and search trade requests from the TradeChainGuardian network.</p>
+        </div>
+      </div>
 
       {/* ── Sent / Received Toggle ───────────────── */}
       <div className="flex items-center gap-2">
@@ -254,13 +267,13 @@ export default function RequestReportPage() {
       {/* ── Table Card ───────────────────────────── */}
       <Card className={`shadow-sm border ${VIOLET.border} flex-1`}>
 
-        <CardHeader className={`py-3 px-4 border-b ${VIOLET.border} ${VIOLET.header} rounded-t-lg`}>
+        <CardHeader className={`py-4 px-6 border-b ${VIOLET.border} ${VIOLET.header} rounded-t-lg`}>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className={`text-base font-semibold ${VIOLET.accent}`}>
+              <CardTitle className={`text-lg font-semibold ${VIOLET.accent}`}>
                 {tab === "sent" ? "Sent Requests" : "Received Requests"}
               </CardTitle>
-              <CardDescription className="text-xs mt-0.5">
+              <CardDescription className="text-sm mt-0.5 font-medium">
                 {loading
                   ? "Loading…"
                   : `${processed.length} record${processed.length !== 1 ? "s" : ""} found`}
@@ -303,56 +316,56 @@ export default function RequestReportPage() {
 
           {/* Table */}
           {!loading && !error && paged.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={`text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b ${VIOLET.border} ${VIOLET.header}`}>
-                    <th className="px-4 py-3 text-left">#</th>
-                    <th className="px-4 py-3 text-left">Request ID</th>
-                    <th className="px-4 py-3 text-left">Sender</th>
-                    <th className="px-4 py-3 text-left">Receiver</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th
-                      className="px-4 py-3 text-left cursor-pointer select-none"
-                      onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-                    >
-                      Created <SortIcon dir={sortDir} />
-                    </th>
-                    <th className="px-4 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paged.map((row, idx) => (
-                    <tr key={row.id ?? row.request_id} className={`transition-colors ${VIOLET.hoverRow}`}>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {(safePage - 1) * PAGE_SIZE + idx + 1}
-                      </td>
-                      <td className="px-4 py-3 font-mono font-medium text-xs text-violet-700 dark:text-violet-300 truncate max-w-[160px]">
-                        {row.request_id}
-                      </td>
-                      <td className="px-4 py-3 font-medium">{row.sender_name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.receiver_name}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={row.status} />
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
-                        {fmt(row.created_at)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-violet-500 hover:text-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30"
-                          title="View details"
-                          onClick={() => navigate(`/report/request/${row.request_id}`)}
-                        >
-                          <ArrowRightCircle className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex flex-col">
+              {/* Table Header */}
+              <div className={`grid grid-cols-10 gap-2 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b ${VIOLET.border} ${VIOLET.header}`}>
+                <div className="col-span-1">#</div>
+                <div className="col-span-2">Request ID</div>
+                <div className="col-span-2">Sender</div>
+                <div className="col-span-2">Receiver</div>
+                <div className="col-span-1 text-center">Status</div>
+                <div 
+                  className="col-span-1.5 cursor-pointer select-none flex items-center"
+                  onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+                >
+                  Created <SortIcon dir={sortDir} />
+                </div>
+                <div className="col-span-0.5 text-right">Action</div>
+              </div>
+
+              {/* Table Body */}
+              <div className="divide-y divide-border">
+                {paged.map((row, idx) => (
+                  <div
+                    key={row.id ?? row.request_id}
+                    className={`grid grid-cols-10 gap-2 px-6 py-4 items-center text-sm transition-colors ${VIOLET.hoverRow}`}
+                  >
+                    <div className="col-span-1 text-muted-foreground font-medium">
+                      {(safePage - 1) * PAGE_SIZE + idx + 1}
+                    </div>
+                    <div className="col-span-2 font-mono font-bold text-xs text-violet-600 dark:text-violet-400 truncate">
+                      {row.request_id}
+                    </div>
+                    <div className="col-span-2 font-medium truncate">{row.sender_name}</div>
+                    <div className="col-span-2 text-muted-foreground truncate">{row.receiver_name}</div>
+                    <div className="col-span-1 text-center">
+                      <StatusBadge status={row.status} />
+                    </div>
+                    <div className="col-span-1.5 text-muted-foreground whitespace-nowrap text-xs">
+                      {fmt(row.created_at)}
+                    </div>
+                    <div className="col-span-0.5 text-right">
+                      <Button
+                        size="sm"
+                        className="bg-violet-600 hover:bg-violet-700 text-white h-8 px-3 rounded-md transition-all shadow-sm active:scale-95"
+                        onClick={() => navigate(`/requests/details/${row.request_id}`)}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

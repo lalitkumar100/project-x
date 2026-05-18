@@ -257,6 +257,7 @@ useEffect(() => {
 
         if(res.status == 200){
           localStorage.removeItem("token");
+          localStorage.removeItem("business_name");
         }
 
  

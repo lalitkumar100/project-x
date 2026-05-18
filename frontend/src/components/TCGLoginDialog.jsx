@@ -43,14 +43,18 @@ export default function TCGLoginDialog() {
 
     setLoading(true);
     try {
-      const baseUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const baseUrl = import.meta.env.VITE_RETAIL_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
       const { data } = await axios.post(`${baseUrl}/v1/api/tcg/login`, {
+
         email:    email.trim(),
         password: password.trim(),
       });
 
       if (data.success && data.token) {
         localStorage.setItem("tcg_token", data.token);
+        if (data.business_name) {
+          localStorage.setItem("business_name", data.business_name);
+        }
         toast.success("TCG connected successfully!", {
           description: "TradeChainGuardian session is now active.",
         });

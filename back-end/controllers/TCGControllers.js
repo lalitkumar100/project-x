@@ -7,7 +7,8 @@ const path  = require('path');
  * Located at the project root so every service can reach it.
  * Read fresh on every call — no server restart needed when token changes.
  */
-const TCG_CONFIG_PATH = path.resolve(__dirname, '../../tcg_config.json');
+const TCG_CONFIG_PATH = path.resolve(__dirname, '../TCG_Config.json');
+
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,8 @@ function getTCGToken() {
   try {
     const raw  = fs.readFileSync(TCG_CONFIG_PATH, 'utf-8');
     const data = JSON.parse(raw);
-    return data.TCG_TOKEN || '';
+    return data.TCG_token || '';
+
   } catch {
     return '';
   }
@@ -36,9 +38,9 @@ function getTCGToken() {
  */
 function saveTCGToken(token) {
   const payload = {
-    TCG_TOKEN:  token,
-    updated_at: new Date().toISOString(),
+    TCG_token:  token,
   };
+
   fs.writeFileSync(TCG_CONFIG_PATH, JSON.stringify(payload, null, 2), 'utf-8');
 }
 
@@ -92,13 +94,15 @@ const tcgLogin = async (req, res) => {
     // ── Persist token to tcg_config.json (runtime, no restart needed) ──────
     saveTCGToken(token);
 
-    console.log('[TCGControllers] Token refreshed and saved to tcg_config.json');
+    console.log('[TCGControllers] Token refreshed and saved to TCG_Config.json');
+
 
     // ── Respond ────────────────────────────────────────────────────────────
     return res.status(200).json({
       success: true,
-      message: 'Logged in successfully. Token saved to tcg_config.json.',
+      message: 'Logged in successfully. Token saved to TCG_Config.json.',
       token,
+      business_name: tcgResponse.data.business_name || (tcgResponse.data.user && tcgResponse.data.user.business_name) || '',
     });
   } catch (error) {
     if (error.response) {

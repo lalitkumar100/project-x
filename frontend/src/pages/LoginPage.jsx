@@ -46,6 +46,9 @@ export default function LoginPage() {
       });
       console.log("Login successful:", response.data);
       localStorage.setItem("token", response.data.token);
+      if (response.data.business_name) {
+        localStorage.setItem("business_name", response.data.business_name);
+      }
       if(response.data.role === "worker"){
         navigate("/worker");
       }

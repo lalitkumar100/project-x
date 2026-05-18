@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_TCG_URL;
+const BASE_URL = import.meta.env.VITE_TCG_URL || "http://localhost:5001";
 
 /**
  * useTCGCall
@@ -28,12 +28,14 @@ export function useTCGCall() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
+  const [status,  setStatus]  = useState(null);
 
   const call = useCallback(async ({ route, method = "GET", body = null, params = {} } = {}) => {
     const token = localStorage.getItem("tcg_token");
 
     setLoading(true);
     setError(null);
+    setStatus(null);
 
     try {
       const res = await axios({
@@ -45,19 +47,24 @@ export function useTCGCall() {
       });
 
       setData(res.data);
-      return res.data;
+      setStatus(res.status);
+      return { data: res.data, status: res.status };
 
     } catch (err) {
+      const resp = err?.response;
+      const st = resp?.status || 500;
+      setStatus(st);
+      
       const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error   ||
+        resp?.data?.message ||
+        resp?.data?.error   ||
         "TCG server error.";
       setError(msg);
-      return null;
+      return { data: null, status: st };
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { call, data, loading, error };
+  return { call, data, loading, error, status };
 }

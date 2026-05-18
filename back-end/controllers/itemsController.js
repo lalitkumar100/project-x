@@ -104,7 +104,24 @@ const getItemById = asyncHandler(async (req, res) => {
   }
 
   const { rows } = await pool.query(
-    `SELECT * FROM items_overview WHERE id = $1`,
+    `SELECT 
+       i.id,
+       i.name,
+       i.quantity,
+       b.name AS brand,
+       s.name AS subcategory,
+       c.name AS category,
+       i.total_items_sold,
+       i.warranty_months,
+       i.mrp,
+       i.reorder_level,
+       i.description,
+       i.net_buy_price
+     FROM items i
+     LEFT JOIN brands b ON i.brand_id = b.id
+     LEFT JOIN subcategories s ON i.subcategory_id = s.id
+     LEFT JOIN categories c ON i.category_id = c.id
+     WHERE i.id = $1`,
     [id]
   );
 

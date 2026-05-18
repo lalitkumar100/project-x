@@ -2,6 +2,9 @@ const pool = require('../config/db');
 const AppError = require('../utils/AppError');
 const salesRepository = require('../repositories/salesRepository');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+
 
 const normalizeString = (value) => String(value || '').trim();
 
@@ -21,20 +24,42 @@ const toPositiveInteger = (value, fieldName) => {
   return number;
 };
 
-const getTcgConfig = () => ({
-  serverUrl: normalizeString(process.env.TCG_SERVER_URL || process.env.TCG_URL).replace(/\/$/, ''),
-  token: normalizeString(process.env.TCG_TOKEN)
-});
+const TCG_CONFIG_PATH = path.resolve(__dirname, '../TCG_Config.json');
+
+const getTcgConfig = () => {
+  let token = normalizeString(process.env.TCG_TOKEN);
+
+  try {
+    if (fs.existsSync(TCG_CONFIG_PATH)) {
+      const raw = fs.readFileSync(TCG_CONFIG_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data.TCG_token) {
+        token = data.TCG_token;
+      }
+    }
+  } catch (error) {
+    console.error('[SalesService] Error reading TCG token from config file:', error.message);
+  }
+
+
+  return {
+    serverUrl: normalizeString(process.env.TCG_SERVER_URL || process.env.TCG_URL).replace(/\/$/, ''),
+    token
+  };
+};
+
 
 const isTcgAuthError = (error) => {
   const status = error.response?.status;
   return status === 401 || status === 403;
 };
 
-const validateTcgUser = async (tcgId) => {
-  const { serverUrl, token } = getTcgConfig();
+const validateTcgUser = async (tcgId, overrideToken = null) => {
+  const { serverUrl, token: configToken } = getTcgConfig();
+  const token = (overrideToken && overrideToken !== 'null') ? overrideToken : configToken;
 
   if (!serverUrl || !token) {
+    console.error('[SalesService] TCG Authentication failed: Missing serverUrl or token', { serverUrl, hasToken: !!token });
     throw new AppError('TCG authentication failed', 502);
   }
 
@@ -62,10 +87,12 @@ const validateTcgUser = async (tcgId) => {
   }
 };
 
-const postBlockchainTransaction = async ({ tcgId, invoiceNumber, finalAmount, items }) => {
-  const { serverUrl, token } = getTcgConfig();
+const postBlockchainTransaction = async ({ tcgId, invoiceNumber, finalAmount, items }, overrideToken = null) => {
+  const { serverUrl, token: configToken } = getTcgConfig();
+  const token = (overrideToken && overrideToken !== 'null') ? overrideToken : configToken;
 
   if (!serverUrl || !token) {
+    console.error('[SalesService] TCG Authentication failed during transaction: Missing token', { serverUrl, hasToken: !!token });
     throw new AppError('TCG authentication failed', 502);
   }
 
@@ -100,6 +127,7 @@ const postBlockchainTransaction = async ({ tcgId, invoiceNumber, finalAmount, it
     throw new AppError(error.response?.data?.message || 'Blockchain transaction failed', 502);
   }
 };
+
 
 const validateSalePayload = (payload) => {
   if (!payload || typeof payload !== 'object') {
@@ -145,7 +173,8 @@ const validateSalePayload = (payload) => {
   };
 };
 
-const validateWholesaleTcg = async (customer) => {
+const validateWholesaleTcg = async (customer, overrideToken = null) => {
+
   const tcgVerification = Boolean(customer?.tcg_verification ?? customer?.tcg_verified);
 
   if (!tcgVerification) {
@@ -160,7 +189,8 @@ const validateWholesaleTcg = async (customer) => {
   }
 
   const tcgId = toPositiveInteger(customer.tcg_id, 'customer.tcg_id');
-  await validateTcgUser(tcgId);
+  await validateTcgUser(tcgId, overrideToken);
+
 
   return {
     tcg_id: tcgId,
@@ -172,6 +202,16 @@ const resolveCustomerId = async (client, customer) => {
   const customerType = normalizeString(customer?.type).toLowerCase();
 
   if (customerType === 'unregistered') {
+    // Ensure the default "Unregistered" customer exists with ID 1
+    const { rows } = await client.query('SELECT id FROM customers WHERE id = 1');
+    if (rows.length === 0) {
+      await client.query(`
+        INSERT INTO customers (id, name)
+        VALUES (1, 'Unregistered')
+        ON CONFLICT (id) DO NOTHING
+      `);
+      await client.query(`SELECT setval('customers_id_seq', COALESCE((SELECT MAX(id) FROM customers), 1), true)`);
+    }
     return 1;
   }
 
@@ -255,7 +295,8 @@ const buildInvoiceNumber = (billingDate, saleId) => (
 
 const createSale = async (payload, billingType, options = {}) => {
   const saleData = validateSalePayload(payload);
-  const tcg = options.enableTcg ? await validateWholesaleTcg(payload.customer) : {
+  const tcg = options.enableTcg ? await validateWholesaleTcg(payload.customer, payload.token) : {
+
     tcg_id: null,
     tcg_verification: false
   };
@@ -325,7 +366,8 @@ const createSale = async (payload, billingType, options = {}) => {
         invoiceNumber: committedSale.invoice_number,
         finalAmount: committedSale.final_amount,
         items: committedSale.items
-      });
+      }, payload.token);
+
 
       const transactionId = blockchainResult?.transaction_id
         || blockchainResult?.txn_id
@@ -358,8 +400,46 @@ const createWholesaleSale = (payload) => createSale(payload, 'wholesale', { enab
 
 const createWholesalerSale = createWholesaleSale;
 
+const resolveRequestItems = async (items) => {
+  if (!Array.isArray(items)) return { matched: [], unmatched: [] };
+
+  const matched = [];
+  const unmatched = [];
+
+  for (const item of items) {
+    const itemName = normalizeString(item.name);
+    
+    // Try to find a exact or close match by name
+    const query = `
+      SELECT id, name, brand, subcategory, quantity as stock, mrp as selling_price, net_buy_price
+      FROM items_overview
+      WHERE LOWER(name) = LOWER($1)
+      LIMIT 1;
+    `;
+    
+    const { rows } = await pool.query(query, [itemName]);
+    
+    if (rows.length > 0) {
+      const dbItem = rows[0];
+      matched.push({
+        item_id: dbItem.id,
+        name: dbItem.name,
+        quantity: Number(item.quantity || 1),
+        stock: Number(dbItem.stock || 0),
+        selling_price: Number(dbItem.selling_price || 0),
+        net_buy_price: Number(dbItem.net_buy_price || 0)
+      });
+    } else {
+      unmatched.push(item);
+    }
+  }
+
+  return { matched, unmatched };
+};
+
 module.exports = {
   createRetailSale,
   createWholesaleSale,
-  createWholesalerSale
+  createWholesalerSale,
+  resolveRequestItems
 };

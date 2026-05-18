@@ -19,10 +19,11 @@ frontend/dist/
 # ── misc legacy ignores ───────────────────────────────────────────
 data/
 learned/
+node_modules
 
-
-pgsql/
+# ── desktop / appliance ignores ──────────────────────────────────
 cude/
 dist_installer/
+pgsql/
+CONTEXT
 context/
-node_modules

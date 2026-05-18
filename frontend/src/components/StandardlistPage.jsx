@@ -52,7 +52,7 @@ export default function StandardListPage({
   columns,
   renderRow,
   renderMobileRow,
-  backPath       = "/dashboard",
+  backPath       = "/report",
   exportTable,
   onExport,
   mobileTitle,

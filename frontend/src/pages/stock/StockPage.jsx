@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { downloadAsExcel } from "@/lib/download-utils";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:6000";
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
+const url = import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 const COLUMNS = [
@@ -295,7 +296,7 @@ export default function GeneralStockPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/")}
             aria-label="Go back"
           >
             <ArrowLeft className="h-5 w-5" />
