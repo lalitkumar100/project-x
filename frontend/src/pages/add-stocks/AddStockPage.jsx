@@ -93,10 +93,10 @@ export default function AddStockPage() {
   const [purchaseError, setPurchaseError] = useState("");
   const [purchaseSuccess, setPurchaseSuccess] = useState("");
   const [duplicateWarning, setDuplicateWarning] = useState("");
+  const [successDialog, setSuccessDialog] = useState({ open: false, message: "" });
   const [highlightedIndex, setHighlightedIndex] = useState(null);
-
   const tcg = useTCGCall();
-
+  const [transactionId, setTransactionId] = useState(null);
   // Invoice Fetch Dialog state
   const [invoiceFetch, setInvoiceFetch] = useState({
     open: false,
@@ -259,6 +259,7 @@ export default function AddStockPage() {
     if (status === 200 && data?.success) {
       setInvoiceFetch((prev) => ({ ...prev, phase: "success" }));
       const txData = data.data;
+      setTransactionId(txData.id ?? null);
 
       // Autofill wholesaler info from sender
       wholesalerForm.setValue("name", txData.sender_info?.name || "");
@@ -443,8 +444,21 @@ export default function AddStockPage() {
       const response = await axios.post(`${BASE_URL}/v1/api/admin/purchase`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      // After purchase success, accept the transaction via TCG service if transactionId is available
+      if (transactionId) {
+        try {
+          const acceptResp = await tcg.call({
+            route: `/v1/api/transactions/${transactionId}/accept`,
+            method: "POST",
+          });
+          // Optionally handle accept response
+        } catch (acceptError) {
+          console.error("Failed to accept transaction", acceptError);
+        }
+      }
       setPurchaseError("");
       setPurchaseSuccess(response?.data?.message || "Purchase submitted successfully.");
+      setSuccessDialog({open:true, message: response?.data?.message || "Purchase submitted successfully."});
       invoiceForm.reset({ items: [] });
       setWholesalerPicked(false);
     } catch (error) {
@@ -889,6 +903,19 @@ export default function AddStockPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+{/* Success Dialog */}
+<Dialog open={successDialog.open} onOpenChange={(open)=> setSuccessDialog(prev=>({ ...prev, open }))}>
+  <DialogContent className="sm:max-w-md">
+    <DialogHeader>
+      <DialogTitle>Success</DialogTitle>
+      <DialogDescription>{successDialog.message}</DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+      <Button onClick={()=>{ setSuccessDialog({open:false, message:""}); navigate('/stock'); }}>Go to Inventory</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* ── TCG Invoice Fetch Dialog ── */}
       {invoiceFetch.open && (
